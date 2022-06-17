@@ -5,6 +5,7 @@
 
 import numpy as np
 import pandas as pd
+import os
 
 columns_f1_str = 'time_frame,cardholder_type,cardholder_location_level,cardholder_location,merchant_location_level,merchant_location,pan_cnt,txn_cnt,txn_gbp_amt,mcc_rank1,mcc_rank2,mcc_rank3'
 columns_f2_str = 'time_frame,cardholder_type,cardholder_postcode_level,cardholder_location,mcc,merchant_channel,pan_cnt,txn_cnt,txn_gbp_amt,merchant_outlet_cnt,percent_repeat'
@@ -132,6 +133,7 @@ np.random.seed(0)
 file4 = gen_file4(1700)
 # print(file4)
 
+os.makedirs('data', exist_ok=True)
 file1.to_csv('data/file1.csv')
 file2.to_csv('data/file2.csv')
 file3.to_csv('data/file3.csv')

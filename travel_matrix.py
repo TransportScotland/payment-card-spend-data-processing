@@ -1,12 +1,14 @@
+# generate a matrix/table where 
+# horizontal headers are origin locations (columns)
+# vertical "headers" are destination locations (rows)
+# cells are summarised pan_cnt or another measure (txn_cnt or txn_gbp_amt)
+#
+# author: Transport Scotland
+
 import pandas as pd
 pd.options.display.max_columns = 20
 
-# basically trying to output a csv of a matrix where
-# horizontal headers are origin locations (columns)
-# vertical "headers" are destination locations (rows)
-# cells are pan_cnt or another measure (txn_cnt or txn_gbp_amt)
-
-# ideally they could be sorted in a way that places close-by locations next to each other
+# ideally the locations could be sorted in a way that places close-by locations next to each other
 # alternatively alphabet sort works for now bc it groups same postcode areas together
 
 
@@ -21,7 +23,7 @@ print(loc_df)
 # from LOC inner join FACT on merchant inner join LOC on cardholder 
 # group by (m.district, c.district)
 #
-# then pivot somehow - might be best using pandas actually
+# then pivot somehow - might be best using pandas actually instead of SQL
 df = pd.merge(fact_df, loc_df,'inner', left_on='merchant_id', right_on='id')
 df = pd.merge(df, loc_df, 'inner', left_on='cardholder_id', right_on='id', suffixes=['_m', '_c'])
 df = df.rename(columns={'district_c': 'origin', 'sector_m': 'destination'})
