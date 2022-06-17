@@ -134,8 +134,8 @@ file4 = gen_file4(1700)
 # print(file4)
 
 os.makedirs('data', exist_ok=True)
-file1.to_csv('data/file1.csv')
-file2.to_csv('data/file2.csv')
-file3.to_csv('data/file3.csv')
-file4.to_csv('data/file4.csv')
+file1.to_csv('data/file1.csv', index=False)
+file2.to_csv('data/file2.csv', index=False)
+file3.to_csv('data/file3.csv', index=False)
+file4.to_csv('data/file4.csv', index=False)
 

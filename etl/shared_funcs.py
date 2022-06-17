@@ -1,10 +1,13 @@
 import pandas as pd
 import os
+import time
 
 
 dicts = {}
 dict_maxids = {}
 dict_headers = {}
+
+skipped_rows = []
 
 def new_dim_dict(name, headers):
     # this lowkey begs for being a class
@@ -14,7 +17,6 @@ def new_dim_dict(name, headers):
     dicts[name] = {}
     dict_maxids[name] = 0
     dict_headers[name] = headers
-    pass
 
 def add_to_dict_if_not_in(dict_name, key, values: list):
     if key not in dicts[dict_name]:
@@ -32,9 +34,8 @@ def handle_one(dict_name, row, row_index):
 
 # this is somewhat slow too, could prob be sped up
 def postcode_sector_to_loc_list(sector: str):
-    # won't work right - postcodes can be weird, eg AA1A 1AA
-
-    district = sector.rsplit(' ', maxsplit=1)[0]
+    # district = sector.rsplit(' ', maxsplit=1)[0]
+    district = sector[:-2]
 
     # first digit if second digit is number, else first two digits.
     # to confirm if any postcodes areas are 3 chars (simple loop then)
@@ -48,6 +49,9 @@ def postcode_sector_to_loc_list(sector: str):
 # removing increases speed by 15%
 def handle_time(row, index = 0):
     time_raw = str(row[index]) #optional depending on stuff
+    if (not time_raw[0].isnumeric()):
+        # a quarter - skipping for now
+        raise
     year = int(time_raw[:4]) #check if faster this or 202201 / 100 and 202201 % 100
     month = int(time_raw[4:6])
     quarter = int(month / 3)
@@ -73,12 +77,48 @@ def handle_loc(row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCO
 
 
 def read_and_handle(path, row_func, fact_list):
+    time0 = time.time()
+    skipped_rows_added = False
     with open(path) as file:
-        headers = file.__next__().rstrip().split(',')[1:] #skipping col 0 for now
+        headers = file.__next__().rstrip().split(',')#[1:] #skipping col 0 for now
         # print(headers)
+
         for line in file:
-            vals = line.rstrip().split(',')[1:]
-            row_func(vals, fact_list)
+            stripped = line.strip()
+            vals = stripped.split(',')#[1:]
+            # print(stripped) 
+            try:
+                row_func(vals, fact_list)
+            except:
+                if not skipped_rows_added:
+                    skipped_rows.append(f'#### Skipped rows of {path}:')
+                    skipped_rows_added = True
+                skipped_rows.append(stripped)
+
+    time1 = time.time()
+    print(f'read and handle took {time1-time0} seconds on file {os.path.basename(path)}.')
+        # if skipped_rows:
+        #     print()
+        #     print('skipped rows:')
+        #     for r in skipped_rows:
+        #         print(r)
+
+def ensure_dim(name, headers):
+    if name in dicts:
+        if name not in dict_headers:
+            raise "Mismanaged dim dictionaries: name in dicts but not in dict_headers"
+            # maybe only print error and don't raise
+        old_headers = dict_headers[name]
+        if headers != old_headers:
+            raise ValueError(f'New headers do not match old headers. Old: {old_headers}; new: {headers}')
+    else:
+        #name not in dicts -> add
+        new_dim_dict(name, headers)
+
+# def ensure_dims(dims_list):
+#     for dim in dims_list:
+#         ensure_dim(dim[0], dim[1])
+
 
 def get_headers(dict_name):
     return dict_headers[dict_name]
