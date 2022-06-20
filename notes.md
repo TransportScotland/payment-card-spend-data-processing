@@ -11,3 +11,4 @@
 * converting to (batched) stream processing to accommodate huge data
 * maybe think of a better way to create csvs and sql statements than turning into dataframe
 * load census info
+* think about fixing the structure of my data and my code

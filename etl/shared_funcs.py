@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import time
+import csv
 
 
 dicts = {}
@@ -76,24 +77,33 @@ def handle_loc(row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCO
 
 
 
-def read_and_handle(path, row_func, fact_list):
+def read_and_handle(path, row_func, fact_list, skip_n_rows = 1, skip_after_0_empty = False):
     time0 = time.time()
     skipped_rows_added = False
     with open(path) as file:
-        headers = file.__next__().rstrip().split(',')#[1:] #skipping col 0 for now
-        # print(headers)
+        for i in range(skip_n_rows):
+            headers = file.__next__().rstrip().split(',')#[1:] #skipping col 0 for now
+            # print(headers)
 
-        for line in file:
-            stripped = line.strip()
-            vals = stripped.split(',')#[1:]
+        # using csv reader slows down execution by like 30% - from 5.2s to 7.2s
+        # but it is somewhat necessary for the census data
+        
+        csvreader = csv.reader(file)
+        for row in csvreader:
+        # for line in file:
+            # stripped = line.strip()
+            # row = stripped.split(',')#[1:]
             # print(stripped) 
+            if skip_after_0_empty and not row[0]:
+                break
             try:
-                row_func(vals, fact_list)
-            except:
+                row_func(row, fact_list)
+            except Exception as e:
+                print(e)
                 if not skipped_rows_added:
                     skipped_rows.append(f'#### Skipped rows of {path}:')
                     skipped_rows_added = True
-                skipped_rows.append(stripped)
+                skipped_rows.append(row)
 
     time1 = time.time()
     print(f'read and handle took {time1-time0} seconds on file {os.path.basename(path)}.')
