@@ -6,7 +6,8 @@ fact_headers = ['perc_jour', 'perc_pan',
     'time_id', 'merchant_id', 'transport_mode_id']
 
 
-def create_dims(row, fact_list):
+# def create_dims(row, fact_list):
+def create_dims(row):
     time_id = shared_funcs.handle_time(row) # can keep
     
     # print(row)
@@ -18,17 +19,20 @@ def create_dims(row, fact_list):
 
     perc_jour = row[4]
     perc_pan = row[5]
-    fact_list.append([perc_jour, perc_pan, time_id, merchant_id, transport_mode_id])
+    return (perc_jour, perc_pan, time_id, merchant_id, transport_mode_id)
+    # fact_list.append([perc_jour, perc_pan, time_id, merchant_id, transport_mode_id])
 
 
-def etl(data_folder, file_name):
+
+def etl(in_path, out_fpath):
     shared_funcs.ensure_dim('time', ['raw', 'year', 'quarter', 'month', 'id'])
     shared_funcs.ensure_dim('location',['sector', 'district', 'area', 'region', 'id'])
     shared_funcs.ensure_dim('transport_mode', ['transport_mode', 'id'])
     fact_list = []
     
     # time0 = time.time()
-    shared_funcs.read_and_handle(os.path.join(data_folder, file_name), create_dims, fact_list)
+    shared_funcs.batch_process(in_path, create_dims, fact_headers, out_fpath)
+    # shared_funcs.read_and_handle(os.path.join(data_folder, file_name), create_dims, fact_list)
     # time1 = time.time()
     # print(f'read and handle took {time1-time0} seconds on File 4.')
     

@@ -2,6 +2,8 @@ import pandas as pd
 import os
 import time
 import csv
+# import queue # adds a TON of overhead, only for multiprocessing
+from collections import deque
 
 
 dicts = {}
@@ -77,6 +79,7 @@ def handle_loc(row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCO
 
 
 
+# maybe use a generator instead
 def read_and_handle(path, row_func, fact_list, skip_n_rows = 1, skip_after_0_empty = False):
     time0 = time.time()
     skipped_rows_added = False
@@ -99,6 +102,7 @@ def read_and_handle(path, row_func, fact_list, skip_n_rows = 1, skip_after_0_emp
             try:
                 row_func(row, fact_list)
             except Exception as e:
+                # todo make my own exceptions to not mix them up with built-in ones
                 print(e)
                 if not skipped_rows_added:
                     skipped_rows.append(f'#### Skipped rows of {path}:')
@@ -129,6 +133,57 @@ def ensure_dim(name, headers):
 #     for dim in dims_list:
 #         ensure_dim(dim[0], dim[1])
 
+def split_line(line):
+    return line.rstrip().split(',')
+
+def save_batch_csv(batch, path):
+    def row_to_saveable(row):
+        return ','.join([str(e) for e in row]) + '\n'
+    # save_lines = [','.join(str(batch.get_nowait())) for _ in range(batch.qsize())]
+    # save_lines = [','.join(row) for row in batch]
+    # save_str = '\n'.join(save_lines)
+    # save_lines = [row_to_saveable(batch.popleft()) for _ in range(len(batch))]
+    save_lines = [row_to_saveable(e) for e in batch]
+    # save_lines = [row_to_saveable(batch.get_nowait()) for _ in range(batch.qsize())]
+    # print(save_lines)
+    with open(path, 'a') as file:
+        #probably instead open the file/connection at the beginning and close at the end
+        # file.write(save_str)
+        file.writelines(save_lines)
+
+def save_csv_headers(path, headers):
+    with open(path, 'w') as file:
+        file.write(f'{",".join(headers)}\n')
+
+def batch_process(path, row_func, fact_headers, out_fpath):
+    time0 = time.time()
+    with open(path) as file:
+        headers = next(file)
+        # batch = queue.Queue(2000)
+        batch = deque([], 2000)
+
+        save_csv_headers(out_fpath,fact_headers)
+        for line in file:
+            row = split_line(line)
+            fact_line = row_func(row)
+            try:
+                # batch.put_nowait(fact_line)
+                batch.append(fact_line)
+            # except queue.Full:
+            except IndexError:
+                save_batch_csv(batch, out_fpath)
+
+        # save remaining items in the queue
+        # if not batch.empty():
+        if not len(batch) == 0:
+            save_batch_csv(batch, out_fpath)
+            # if batch.full():
+            #     save_batch_csv(batch)
+    time1 = time.time()
+    print(f'read handle and write took {time1-time0} seconds on file {os.path.basename(path)}.')
+    
+
+
 
 def get_headers(dict_name):
     return dict_headers[dict_name]
@@ -151,4 +206,5 @@ def list_to_csv(list, headers, folder, name):
     if not os.path.exists(folder):
         os.makedirs(folder)
     df = list_to_df(list, headers)
-    df.to_csv(os.path.join(folder, name))
+    df.to_csv(os.path.join(folder, name), index = False)
+    

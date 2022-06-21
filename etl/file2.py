@@ -7,7 +7,8 @@ fact_headers = ['pan_cnt', 'txn_cnt', 'txn_gbp_amt',
 'time_id', 'cardholder_id', 'category_id', 'm_channel_id']
 
 
-def create_dims(row, fact_list):
+# def create_dims(row, fact_list):
+def create_dims(row):
     time_id = shared_funcs.handle_time(row) # can keep
     
     cardholder_id = shared_funcs.handle_loc(row, 2, 3, 'Postcode_Sector')
@@ -23,10 +24,12 @@ def create_dims(row, fact_list):
     txn_gbp_amt = row[8]
     merchant_outlet_count = row[9]
     percent_repeat = row[10]
-    fact_list.append([pan_cnt, txn_cnt, txn_gbp_amt, merchant_outlet_count, percent_repeat, 
-        time_id, cardholder_id, category_id, m_channel_id])
+    return (pan_cnt, txn_cnt, txn_gbp_amt, merchant_outlet_count, percent_repeat, 
+        time_id, cardholder_id, category_id, m_channel_id)
+    # fact_list.append([pan_cnt, txn_cnt, txn_gbp_amt, merchant_outlet_count, percent_repeat, 
+    #     time_id, cardholder_id, category_id, m_channel_id])
 
-def etl(data_folder, file_name):
+def etl(in_path, out_fpath):
     shared_funcs.ensure_dim('time', ['raw', 'year', 'quarter', 'month', 'id'])
     shared_funcs.ensure_dim('location',['sector', 'district', 'area', 'region', 'id'])
     shared_funcs.ensure_dim('category', ['category', 'id'])
@@ -34,7 +37,8 @@ def etl(data_folder, file_name):
     fact_list = []
     
     # time0 = time.time()
-    shared_funcs.read_and_handle(os.path.join(data_folder, file_name), create_dims, fact_list)
+    shared_funcs.batch_process(in_path, create_dims, fact_headers, out_fpath)
+    # shared_funcs.read_and_handle(os.path.join(data_folder, file_name), create_dims, fact_list)
     # time1 = time.time()
     # print(f'read and handle took {time1-time0} seconds on File 2.')
 
