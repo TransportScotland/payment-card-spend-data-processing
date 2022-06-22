@@ -29,3 +29,13 @@ What can be left to be processed in memory first:
     * make sure to avoid deadlocks by not locking two things at once and also adding a timeout
     * maybe instead use multiprocessing.Manager().lock, then "with lock:"
         * but really don't bc idk python is weird
+
+# notes on speed:
+MySQL built-in load csv takes 10s on the raw dataset or 5.2s on the csv (with 1 mil rows), when no id provided (6s with ID). So it won't get any faster than that (same performance with both InnoDB and MyISAM.)
+So I guess my current limit is ~13s with the intermediate csv step - 7s for process, 6s for load.
+And my current speed with batch size 10,000 and unproteced querys is 16s. same w batch size 1000. 19 seconds for size 100, 88 seconds for size 1. Seems faster with powers of 10^k than 2*10^k (eg 1000 faster than 2000).
+25s with a parameterised query batch 1000.
+20s with escaping and encoding strings, bacth 1000.
+17s with a type int float assert 
+
+See https://www.slideshare.net/billkarwin/load-data-fast (esp slide 50) for a speed comparison 

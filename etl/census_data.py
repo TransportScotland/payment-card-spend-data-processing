@@ -43,4 +43,5 @@ def etl(data_folder, file_name):
     add_up_sectors(temp_pop_dict)
     print (pd.DataFrame(zip(temp_pop_dict.keys(), temp_pop_dict.values()), columns=['loc', 'population']))
 
-etl('other_data/', 'KS101SC.csv')
+if __name__ == '__main__':
+    etl('other_data/', 'KS101SC.csv')

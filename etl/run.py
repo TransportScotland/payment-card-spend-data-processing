@@ -1,13 +1,21 @@
-
+#!/usr/bin/env python3
+#line above to prevent accidentally executing as a bash script while running from an NTFS drive partition on a linux machine 
 import time
 import shared_funcs
 import file1, file2, file3, file4
 
 data_folder = 'data/'
-facts_1 = file1.etl('data/file1.csv', 'wh/fact1.csv')
-facts_2 = file2.etl('data/file2.csv', 'wh/fact2.csv')
-facts_3 = file3.etl('data/file3.csv', 'wh/fact3.csv')
-facts_4 = file4.etl('data/file4.csv', 'wh/fact4.csv')
+file1.etl('data/file1.csv')
+file2.etl('data/file2.csv')
+file3.etl('data/file3.csv')
+file4.etl('data/file4.csv')
+
+shared_funcs.save_dims()
+
+# facts_1 = file1.etl('data/file1.csv', 'wh2/fact1.csv')
+# facts_2 = file2.etl('data/file2.csv', 'wh/fact2.csv')
+# facts_3 = file3.etl('data/file3.csv', 'wh/fact3.csv')
+# facts_4 = file4.etl('data/file4.csv', 'wh/fact4.csv')
 
 # data_folder = '../sample_data/'
 # file_names = ['Network_Rail_File1_Spend Origin.csv',

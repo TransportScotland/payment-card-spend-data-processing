@@ -1,8 +1,6 @@
 import shared_funcs
-import os
-import time
 
-fact_headers = ['pan_cnt', 'txn_cnt', 'txn_gbp_amt', 'time_id', 'cardholder_id', 'merchant_id', 'cat1_id', 'cat2_id', 'cat3_id']
+# fact_headers = ('pan_cnt', 'txn_cnt', 'txn_gbp_amt', 'time_id', 'cardholder_id', 'merchant_id', 'cat1_id', 'cat2_id', 'cat3_id')
 
 # removing speeds up by 33%
 # def handle_categories(row, indices = slice(9, 12)):
@@ -24,9 +22,9 @@ def create_dims(row):
         raise
     # cat1_id, cat2_id, cat3_id = (0,0,0) 
     # cat1_id, cat2_id, cat3_id = handle_categories(row)
-    cat1_id = shared_funcs.handle_one('category', row, 9)
-    cat2_id = shared_funcs.handle_one('category', row, 10)
-    cat3_id = shared_funcs.handle_one('category', row, 11)
+    cat1_id = shared_funcs.handle_one_dim('category', row, 9)
+    cat2_id = shared_funcs.handle_one_dim('category', row, 10)
+    cat3_id = shared_funcs.handle_one_dim('category', row, 11)
 
     pan_cnt = row[6]
     txn_cnt = row[7]
@@ -36,19 +34,23 @@ def create_dims(row):
 
 
 
-def etl(in_path, out_fpath):
+def etl(in_path, fact_table_name = 'fact1'):
+    # db = shared_funcs.connect_to_db()
+
     # instead prob do a dimensions list and create dim if not exists
-    shared_funcs.ensure_dim('time', ['raw', 'year', 'quarter', 'month', 'id'])
-    shared_funcs.ensure_dim('location',['sector', 'district', 'area', 'region', 'id'])
-    shared_funcs.ensure_dim('category', ['category', 'id'])
-    fact_list = []
+    # shared_funcs.ensure_dim('time', ['raw', 'year', 'quarter', 'month', 'id'])
+    # shared_funcs.ensure_dim('location',['sector', 'district', 'area', 'region', 'id'])
+    # shared_funcs.ensure_dim('category', ['category', 'id'])
+    # fact_list = []
 
     # time0 = time.time()
-    shared_funcs.batch_process(in_path, create_dims, fact_headers, out_fpath)
+    shared_funcs.ensure_dim_dicts('time', 'location', 'category')
+    shared_funcs.batch_process(in_path, create_dims, fact_table_name)
+    # shared_funcs.batch_process_csv(in_path, create_dims, fact_headers, out_fpath= fact_table_name)
     # shared_funcs.read_and_handle(os.path.join(data_folder, file_name), create_dims, fact_list)
     # time1 = time.time()
     # print(f'read and handle took {time1-time0} seconds on File 1.')
 
-    return fact_list
+    # return fact_list
 
 
