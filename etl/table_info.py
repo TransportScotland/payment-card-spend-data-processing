@@ -1,7 +1,9 @@
 
 
 ALLOWED_TABLES = {'fact1', 'fact2', 'fact3', 'fact4', 
-    'time', 'location', 'category', 'm_channel', 'purpose', 'transport_mode'}
+    'time', 'location', 'category', 'm_channel', 'purpose', 'transport_mode',
+    'census'
+    }
 
 
 # maybe have this as classes/structs instead.
@@ -21,6 +23,7 @@ headers_dict = {
     'm_channel': ('m_channel', 'id'),
     'purpose': ('purpose', 'id'),
     'transport_mode': ('transport_mode', 'id'),
+    'census': ('location', 'population', 'id'),
 }
 
 
@@ -124,6 +127,14 @@ create_strings['purpose'] = (
 create_strings['transport_mode'] = ( 
     "CREATE TABLE transport_mode ("
     "transport_mode VARCHAR(6) NOT NULL,"
+    "id INT NOT NULL AUTO_INCREMENT,"
+    "PRIMARY KEY (id)"
+    ")")
+
+create_strings['census'] = ( 
+    "CREATE TABLE census ("
+    "location VARCHAR(6) NOT NULL," # maybe longer later if needed total scotland
+    "population INT NOT NULL,"
     "id INT NOT NULL AUTO_INCREMENT,"
     "PRIMARY KEY (id)"
     ")")

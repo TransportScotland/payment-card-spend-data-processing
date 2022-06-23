@@ -163,8 +163,17 @@ def batch_process(path, row_func, fact_table_name, dbcon = None):
     print(f'read handle and write took {time1-time0} seconds on file {os.path.basename(path)}.')
 
 
-def save_dim(name, dbcon):
+def save_dim(name, dbcon = None, unique_index :str = None):
     # values = [batch.popleft() for _ in range(len(batch))]
+    if name not in table_info.ALLOWED_TABLES:
+        raise 'Table name not allowed: ' + name
+
+    disconnect = False
+    if not dbcon:
+        dbcon = connect_to_db()
+        disconnect = True
+
+
     values = [tuple(row[:-1])for row in dicts[name].values()]
     headers = table_info.headers_dict[name][:-1]
 
@@ -173,14 +182,21 @@ def save_dim(name, dbcon):
     values_f_str = '(' + ','.join(['%s' for _ in range(len(headers))]) + ')'
 
     sql = f"INSERT INTO {name} {headers_str} VALUES {values_f_str}"
+    
+    create_db_table(name, dbcon)
     dbcon.cursor().executemany(sql, values)
+
+    if unique_index in headers:
+        dbcon.cursor().execute(f'CREATE UNIQUE INDEX {unique_index} ON {name} ({unique_index})')
+    dbcon.commit()
+
+    if disconnect:
+        dbcon.close()
 
 def save_dims():
     dbcon = connect_to_db()
     for name in dicts.keys():
-        create_db_table(name, dbcon)
         save_dim(name, dbcon)
-    dbcon.commit()
     dbcon.close()
 
 def connect_to_db():

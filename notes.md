@@ -11,7 +11,7 @@
 * [/] converting to (batched) stream processing to accommodate huge data
     * multiprocessing could be added later if needed
 * [/] maybe think of a better way to create csvs and sql statements than turning into dataframe
-* load census info
+* [/] load census info
 * think about fixing the structure of my data and my code
     * maybe somehow use generators instead of sending the execution flow back and forth between files the way I'm doing it now
 * try this with the real sample data that I've got to see where it crashes
