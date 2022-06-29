@@ -29,7 +29,7 @@ def rand_postcode_sector_column(num):
     # area = np.random.choice(['G', 'EH'], num )
     # limiting tne number of different area options 
     # in order to have any matching origin-destination pairs in smaller data
-    area = np.random.choice(['A', 'B', 'C', 'DD', 'EE', 'FF', 'GG', 'HH', 'JJ',],num)
+    area = np.random.choice(['AB', 'DD', 'DG', 'EH', 'FK', 'G', 'HS', 'IV'   ], num)#   , 'KA', 'KY', 'ML', 'PA', 'PH', 'TD'],num)
     district = np.random.randint(1, 16, size= num).astype(str)
     sector = np.random.randint(0, 10, size = num).astype(str)
 
