@@ -78,7 +78,7 @@ def new_dim_dict(name):
     if name in dicts:
         raise ValueError(f'Dict with this name already exists: {name}')
     dicts[name] = {}
-    dict_maxids[name] = 0
+    dict_maxids[name] = 1 # sql starts id counting at 1
     dict_headers[name] = table_info.headers_dict[name]
 
 def _ensure_dim_dict(name):

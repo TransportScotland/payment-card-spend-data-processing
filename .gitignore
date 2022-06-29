@@ -1,5 +1,9 @@
-*.csv
-out/*
-wh/*
-experimental/*
+/*.csv
+data/
+other_data/
+wh/
+wh2/
+out/
+wh/
+experimental/
 */__pycache__/*
