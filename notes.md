@@ -28,7 +28,7 @@
 # SQL add user:
     create user 'temp_user'@'localhost' identified by 'password';
     create databse sgov;
-    grant create, drop, select, insert, execute, alter, index on sgov.* to 'temp_user'@'localhost';
+    grant create, drop, select, insert, execute, alter, index, update, delete on sgov.* to 'temp_user'@'localhost';
 
 Power BI is being annoying, need to duplicate tables (New Table; newT = 'originalT')
 

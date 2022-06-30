@@ -5,7 +5,7 @@ import sqlalchemy
 
 time1 = time.time()
 
-df = pd.read_csv('generated_data/durations_matrix2.csv')
+df = pd.read_csv('generated_data/durations_matrix.csv')
 
 locs = pd.read_sql(
     sql='select location, id from census;', 
@@ -51,5 +51,7 @@ df.to_sql(
     if_exists='replace', 
     index=False, 
     dtype={'destination': sqlalchemy.types.INT, 'origin': sqlalchemy.types.INT, 'seconds': sqlalchemy.types.FLOAT})
+with sqlcon.connect() as con:
+    con.execute('ALTER TABLE durations ADD PRIMARY KEY (origin, destination);')
 time3 = time.time()
 print(f'{time2-time1} seconds to load and manipulate, {time3-time2} seconds to SQL.')
