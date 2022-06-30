@@ -15,8 +15,14 @@
 * think about fixing the structure of my data and my code
     * maybe somehow use generators instead of sending the execution flow back and forth between files the way I'm doing it now
     * see if dicts are really necessary everywhere - e.g. category may be better with int indexes
+* the way I'm dealing with dimensions is such a mess, use classes for dimension tables
 * try this with the real sample data that I've got to see where it crashes
+    * do something about handling skipped rows
+* [/] get distance data
+* [/] put distance matrix into database
 * rename ids in dims to match fact tables, eg time.time_id instead of time.id
+* tell stephen about flexi hours stuff and plan a meeting with the scotrail students
+* chase up Network Rail about cloud VMs
 
 
 # SQL add user:
@@ -24,7 +30,7 @@
     create databse sgov;
     grant create, drop, select, insert, execute, alter, index on sgov.* to 'temp_user'@'localhost';
 
-Power BI is being annoying, need to duplicate tables (New Table, newT = 'originalT')
+Power BI is being annoying, need to duplicate tables (New Table; newT = 'originalT')
 
 # Notes on stream processsing and concurrency:
 What needs to be processed in a batch stream straight into a database:

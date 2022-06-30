@@ -1,8 +1,3 @@
-exit() 
-# ^ adding this here to prevent accidentally running this whole file as a script.
-# it's meant to be more of a collection of code that was used to generate 
-# a travel duration matrix, which should not need to be run again.
-# If it is, I may change it to be more like a regular script.
 import pandas as pd
 import sqlalchemy
 
@@ -12,10 +7,14 @@ df = pd.read_sql('select * from census;', con)
 
 # isolate sectors and write to a text file
 sectors = df.loc[df['location'].str.contains(' ')]['location']
-with open('out/all_sectors.txt', 'w') as file:
+with open('generated_data/intermediate/all_sectors.txt', 'w') as file:
     for sector in list(sectors):
         file.write(sector+ '\n')
 
+print('List of sectors saved to generated_data/intermediate/all_sectors.txt.')
+print('Get the geo coordinates into generated_data/intermediate/scotland_sectors_geocode.csv ')
+print('and press Enter to continue')
+_ = input()
 ##### 
 # geocode sectors somehow,
 # currently being done with a third-party app,
@@ -26,7 +25,7 @@ with open('out/all_sectors.txt', 'w') as file:
 # convert geocoded sectors from lat-lng to lng-lat for OpenRouteService
 dic = {}
 ls = []
-with open('other_data/scotland_sectors_geocode.csv') as infile:
+with open('generated_data/intermediate/scotland_sectors_geocode.csv') as infile:
     _ = next(infile)
     import csv
     csvreader = csv.reader(infile)
@@ -37,24 +36,35 @@ with open('other_data/scotland_sectors_geocode.csv') as infile:
 print(f'len(ls): {len(ls)}')
 
 # save the lng-lat locations, now without corresponding sector name
-with open('out/scotland_sector_geo_lng_lat.json', 'w') as outfile:
+with open('generated_data/intermediate/scotland_sector_geo_lng_lat.json', 'w') as outfile:
     import json
     dic = {"locations": ls}
     s = json.dumps(dic)
     outfile.write(s)
 
 
-#####
-# now send the coordinates to OpenRouteService matrix service.
-# this could be done in Python easily if needed,
-# here I just sent a post request manually using Postman and saved the response
-#####
 
+# now send the coordinates to OpenRouteService matrix service.
+r= None
+with open('generated_data/intermediate/scotland_sector_geo_lng_lat.json') as file:
+    import json
+    data = json.loads(file.read())
+    # data['metrics'] = ['distance']
+
+    import requests
+    import time
+    t1 = time.time()
+    r = requests.post('http://localhost:8080/ors/v2/matrix/driving-car', json=data)
+    t2 = time.time()
+    print(f'ORS matrix request took {t2-t1} seconds.')
+
+with open('generated_data/intermediate/ors_service_response.json', 'w') as outfile:
+    outfile.write(r.text)
 
 
 # load the response into a python dict
 js = {}
-with open('other_data/ors_service_response.json') as file:
+with open('generated_data/intermediate/ors_service_response.json') as file:
     file_str = file.read()
     import json
     js = json.loads(file_str)
@@ -66,17 +76,23 @@ with open('other_data/ors_service_response.json') as file:
             print(f"{key}: {js['metadata'][key]}")
 
 
+
+
 # save the response in a csv format
-sectors = df.loc[df['location'].str.contains(' ')]['location']
-sectors_list = list(sectors)
-with open('out/durations_matrix.csv', 'w') as file:
-    file.write('"durations (in seconds. down rows are origins, right columns are destinations. source: Open Route Service)",' + 
+with open('generated_data/intermediate/all_sectors.txt') as file:
+   sectors_list = [l.rstrip() for l in file.readlines()]
+# sectors = df.loc[df['location'].str.contains(' ')]['location']
+# sectors_list = list(sectors)
+metric = 'durations' #or distances
+with open(f'generated_data/{metric}_matrix.csv', 'w') as file:
+    metric_unit = 'seconds' if metric == 'durations' else 'metres' if metric == 'distances' else 'unknown'
+    file.write(f'"{metric} (in {metric_unit}. down rows are origins, right columns are destinations. source: Open Route Service)",' + 
         ','.join(sectors_list) + '\n')
 
-    assert(len(js['durations']) == len(sectors_list))
+    assert(len(js[metric]) == len(sectors_list))
 
     for i in range(len(sectors_list)):
-        row = js['durations'][i]
+        row = js[metric][i]
         file.write(sectors_list[i] + ',' )
         file.write(','.join([str(e) for e in row]))
         file.write('\n')
