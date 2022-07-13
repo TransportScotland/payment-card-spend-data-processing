@@ -20,9 +20,10 @@
     * do something about handling skipped rows
 * [/] get distance data
 * [/] put distance matrix into database
-* rename ids in dims to match fact tables, eg time.time_id instead of time.id
-* tell stephen about flexi hours stuff and plan a meeting with the scotrail students
-* chase up Network Rail about cloud VMs
+* rename ids in dims to match fact tables, eg time.time_id instead of time.id (this will make PowerBI behave nicer about linking)
+* [/] tell stephen about flexi hours stuff and plan a meeting with the scotrail students
+* [/] chase up Network Rail about cloud VMs
+* add a readme and other administrative stuff. maybe comments and docs
 
 
 # SQL add user:
@@ -55,3 +56,19 @@ And my current speed with batch size 10,000 and unproteced querys is 16s. same w
 17s with a type int float assert 
 
 See https://www.slideshare.net/billkarwin/load-data-fast (esp slide 50) for a speed comparison 
+
+# GraphHopper shenanigans:
+* for how to use in code, see /example/src/main/java/com/graphhopper/example/RoutingExample.java
+* for public transport version, should be just a plug'n'play sort of deal with replacing the child class GraphHopperPt for GraphHopper
+* for public transport times, probably get list of instructions and add up the times rather than trying to figure out something from GraphHopperPt
+    * if wanting no java writing, consider line 209 of /reader-gtfs/.../gtfs/PtRouterImpl.java:
+        * responsePath.setTime((solution.get(solution.size() - 1).label.currentTime - solution.get(0).label.currentTime));
+        * maybe replace first currentTime with departureTime
+    * but would highly encourage writing this in java because the API is very slow even on localhost, and the responses file is too big to transfer easily, and it is too big for my laptop to load into memory :/
+    * so it looks like I might have to fork GraphHopper and write my own code for getting public transit times
+    * or give up!
+* the main file is /core/src/main/java/com/graphhopper/GraphHopper.java
+* traveline data takes forever to build - may be worth buying a crazy powerful server just to build the graphs and then serve it from a weaker one.
+* web interfaces seem to be in /web-bundle/.../graphhopper/resources/*Resource.java
+    * but please don't use the web interface, it takes forever.
+    * fun fact, the ORS matrix service took about 45 seconds on localhost to get a matrix of roughly ~1,200,000, GH public transit individual routes are taking 45 MINUTES to get 19,200 routes - some of it might be in the harder public transit routing, but I'd guess most of it will be in the interface (sending and receiving  19200 individual requests rather than a single long one)
