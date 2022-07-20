@@ -5,81 +5,108 @@ import csv
 import MySQLdb
 # import queue # adds a TON of overhead, only for multiprocessing
 from collections import deque
+import dimension
 
 import table_info
 
 
+# dimension dictionaries
 dicts = {}
-dict_maxids = {}
-dict_headers = {}
+# # maximum IDs (last inserted) of dim dictionaries
+# dict_maxids = {}
+# # headers of dictionaries
+# dict_headers = {}
 
+# for error handling
 skipped_rows = []
 
+# # add items to dimension dictionary. in-memory, needs to be saved to the database later
+# # returns ID of key just added or already existing
+# def add_to_dict_if_not_in(dict_name, key, values: list):
+#     if key not in dicts[dict_name]:
+#         values.append(dict_maxids[dict_name])
+#         dicts[dict_name][key] = values
+#         dict_maxids[dict_name] = dict_maxids[dict_name] + 1
+#         return values[-1]
+#     else:
+#         return dicts[dict_name][key][-1] # return id of new key
 def add_to_dict_if_not_in(dict_name, key, values: list):
-    if key not in dicts[dict_name]:
-        values.append(dict_maxids[dict_name])
-        dicts[dict_name][key] = values
-        dict_maxids[dict_name] = dict_maxids[dict_name] + 1
-        return values[-1]
-    else:
-        return dicts[dict_name][key][-1] # return id of new key
+    return dicts[dict_name].add_if_not_in(key, values)
 
+# # a wrapper for add_to_dict_if_not_in for simple dimensions
+# def handle_one_dim(dict_name, row, row_index):
+#     val = row[row_index]
+#     id = add_to_dict_if_not_in(dict_name, val, [val])
+#     return id
 def handle_one_dim(dict_name, row, row_index):
-    val = row[row_index]
-    id = add_to_dict_if_not_in(dict_name, val, [val])
-    return id
+    return dicts[dict_name].add(row, row_index)
 
+# # split up postcode sector into a list of [sector, district, area, region].
+# # region is currently 'unknown', may be Scotland/England/NI/EU later
+# def postcode_sector_to_loc_list(sector: str):
+#     # district = sector.rsplit(' ', maxsplit=1)[0]
+#     district = sector[:-2]
 
-def postcode_sector_to_loc_list(sector: str):
-    # district = sector.rsplit(' ', maxsplit=1)[0]
-    district = sector[:-2]
+#     # first digit if second digit is number, else first two digits.
+#     # to confirm if any postcodes areas are 3 chars (simple loop then)
+#     area = district[0] if district[1].isnumeric() else district[0:2]
 
-    # first digit if second digit is number, else first two digits.
-    # to confirm if any postcodes areas are 3 chars (simple loop then)
-    area = district[0] if district[1].isnumeric() else district[0:2]
+#     # region might have to be done differently (current only known one is scotland)
+#     region = 'unknown'
 
-    # region might have to be done differently (current only known one is scotland)
-    region = 'unknown'
+#     return [sector, district, area, region]
 
-    return [sector, district, area, region]
+# # convert time into year month and quarter and save to dimension dict
+# # removing increases speed by 15%
+# def handle_time(row, index = 0):
+#     time_raw = str(row[index]) #optional depending on stuff
+#     if (not time_raw[0].isnumeric()):
+#         # a quarter - skipping for now
+#         raise
+#     year = int(time_raw[:4]) #check if faster this or 202201 / 100 and 202201 % 100
+#     month = int(time_raw[4:6])
+#     quarter = int(month / 3)
 
-# removing increases speed by 15%
+#     # not sure if I actually need time_raw in the table but maybe there was a reason for it
+#     time_id = add_to_dict_if_not_in('time', time_raw, [time_raw, year, quarter, month])
+#     return time_id
 def handle_time(row, index = 0):
-    time_raw = str(row[index]) #optional depending on stuff
-    if (not time_raw[0].isnumeric()):
-        # a quarter - skipping for now
-        raise
-    year = int(time_raw[:4]) #check if faster this or 202201 / 100 and 202201 % 100
-    month = int(time_raw[4:6])
-    quarter = int(month / 3)
-
-    # not sure if I actually need time_raw in the table but maybe there was a reason for it
-    time_id = add_to_dict_if_not_in('time', time_raw, [time_raw, year, quarter, month])
-    return time_id
+    return dicts['time'].add(row, index)
     
-# 15%
+# # splits up postcode sector to smaller areas and saves to dim dict.
+# # 15%
+# def handle_loc(row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCODE_SECTOR'):
+#     # there may be a better way to do this than a star schema
+#     if row[loc_level_idx] != smallest_area_name:
+#         # probably skip adding this line to the fact table.
+#         # but do save it somewhere to check the sub-sections add up to the right number
+#         # skip handling this until data is known
+#         return -1
+#     sector = row[loc_idx]
+#     loc_list = postcode_sector_to_loc_list(sector)
+
+#     id = add_to_dict_if_not_in('location', sector, loc_list)
+#     return id
 def handle_loc(row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCODE_SECTOR'):
-    # there may be a better way to do this than a star schema
-    if row[loc_level_idx] != smallest_area_name:
-        # probably skip adding this line to the fact table.
-        # but do save it somewhere to check the sub-sections add up to the right number
-        # skip handling this until data is known
-        return -1
-    sector = row[loc_idx]
-    loc_list = postcode_sector_to_loc_list(sector)
-
-    id = add_to_dict_if_not_in('location', sector, loc_list)
-    return id
+    return dicts['location'].add(row, loc_level_idx, loc_idx, smallest_area_name)
 
 
+# create a new dimension dictionary
+# for backwards compatibility purposes atm
 def new_dim_dict(name):
     # this lowkey begs for being a class
     # definitely dict_info and maybe this whole file
     if name in dicts:
         raise ValueError(f'Dict with this name already exists: {name}')
-    dicts[name] = {}
-    dict_maxids[name] = 1 # sql starts id counting at 1
-    dict_headers[name] = table_info.headers_dict[name]
+    if name == 'time':
+        dicts[name] = dimension.TimeDimension()
+    elif name == 'location':
+        dicts[name] = dimension.LocationDimension()
+    else:
+        dicts[name] = dimension.SimpleDimension()
+    # dicts[name] = {}
+    # dict_maxids[name] = 1 # sql starts id counting at 1
+    # dict_headers[name] = table_info.headers_dict[name]
 
 def _ensure_dim_dict(name):
     if name not in dicts:
@@ -174,7 +201,10 @@ def save_dim(name, dbcon = None, unique_index :str = None):
         disconnect = True
 
 
-    values = [tuple(row[:-1])for row in dicts[name].values()]
+    # values = [tuple(row[:-1])for row in dicts[name].values()]
+    # values = [tuple(row[:])for row in dicts[name].dim_list]
+    values = dicts[name].dim_list
+    # print(values)
     headers = table_info.headers_dict[name][:-1]
 
     # headers = headers_dict[table_name]
@@ -183,6 +213,13 @@ def save_dim(name, dbcon = None, unique_index :str = None):
 
     sql = f"INSERT INTO {name} {headers_str} VALUES {values_f_str}"
     
+    # print(values)
+    # print(sql)
+    # print()
+    # print(headers)
+    # print(headers_str)
+    # print(values_f_str)
+    # print(dicts)
     create_db_table(name, dbcon)
     dbcon.cursor().executemany(sql, values)
 
@@ -205,8 +242,10 @@ def connect_to_db():
     return db
 
 
+# def get_headers(dict_name):
+#     return dict_headers[dict_name]
 def get_headers(dict_name):
-    return dict_headers[dict_name]
+    return dicts[dict_name].headers
 
 
 
@@ -227,7 +266,11 @@ def get_headers(dict_name):
 # depracated:
 
 def dict_to_df(dict_name):
-    return pd.DataFrame(data= dicts[dict_name].values(), columns = dict_headers[dict_name])
+    # print(dicts[dict_name].dim_list)
+    # print(dict_name)
+    # print (dicts[dict_name].headers)
+    # print (type(dicts[dict_name].headers))
+    return pd.DataFrame(data= dicts[dict_name].dim_list, columns = list(dicts[dict_name].headers))
 
 def list_to_df(list, headers):
     return pd.DataFrame(data=list, columns=headers)
@@ -236,9 +279,12 @@ def dims_to_csv(folder):
     if not os.path.exists(folder):
         os.makedirs(folder)
 
+    # i = 0
     for name in dicts.keys():
+        # print(i)
         df = dict_to_df(name)
         df.to_csv(os.path.join(folder, f'{name}.csv'))
+        # i += 1
 
 def list_to_csv(list, headers, folder, name):
     if not os.path.exists(folder):
