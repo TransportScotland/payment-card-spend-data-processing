@@ -5,8 +5,8 @@ import csv
 import MySQLdb
 # import queue # adds a TON of overhead, only for multiprocessing
 from collections import deque
-import dimension
 
+import dimension
 import table_info
 
 
@@ -40,6 +40,9 @@ def add_to_dict_if_not_in(dict_name, key, values: list):
 #     return id
 def handle_one_dim(dict_name, row, row_index):
     return dicts[dict_name].add(row, row_index)
+
+def postcode_sector_to_loc_list(sector: str):
+    return dimension.LocationDimension.postcode_sector_to_loc_list(sector)
 
 # # split up postcode sector into a list of [sector, district, area, region].
 # # region is currently 'unknown', may be Scotland/England/NI/EU later
@@ -138,10 +141,22 @@ def create_db_table(table_name, dbcon, drop_if_exists = True):
     c.execute(table_info.create_strings[table_name])
 
 
+total_insert_time = 0
+
 
 
 def save_batch(batch, dbcon, table_name):
-    values = [batch.popleft() for _ in range(len(batch))]
+
+    # connected_here = False
+    # if not dbcon:
+    #     dbcon = connect_to_db()
+    #     con = True
+
+    # batch = batch.copy() #24s rhw, 14s ins, 24s total
+    # # without any copy: #24s rhw, 14s ins, 24s total. somehow, and this time even without missing data
+    # values = [batch.popleft() for _ in range(len(batch))]
+    # values = list(batch) # 24s rhw, 14s ins, 24s total
+    values = batch
 
     headers = table_info.headers_dict[table_name]
     headers_str = '('+ ','.join(headers) + ')'
@@ -158,54 +173,240 @@ def save_batch(batch, dbcon, table_name):
 
     values_str = ','.join([str(v) for v in values])
     bigsql = sql + values_str
-    dbcon.cursor().execute(bigsql)
+    # print(bigsql[:200])
+    time0 = time.time()
+    if values_str != "":
+        dbcon.cursor().execute(bigsql)
+        dbcon.commit()
+    else:
+        print("values_str was empty")
+        # print(values)
+        # print(bigsql)
+        # print(batch)
+    time1 = time.time()
+    global total_insert_time
+    total_insert_time += time1 - time0
 
+    # if connected_here:
+    #     dbcon.close()
 
-def batch_process(path, row_func, fact_table_name, dbcon = None):
+def save_batches(batches, dbcon, table_name):
+    # bl = len(batch)
+    # qs = int(bl / 4)
+    # for b in [batch[:qs], batch[qs:qs*2], batch[qs*2:qs*3], batch[qs*3:]]:
+    for b in batches:
+        save_batch(b, dbcon, table_name)
+
+# import asyncio
+
+# def save_batch_async(batch, dbcon, table_name):
+#     save_batch(batch, dbcon, table_name)
+    # time.sleep(1)
+    # await asyncio.sleep(1)
+
+import concurrent.futures
+def batch_process_threaded(path, row_func, fact_table_name, dbcon: None):
+    # currently takes about the same time as non-async version
     time0 = time.time()
     with open(path) as file:
         headers = next(file) # discard first row
+        # currently using same maxlen for size of insert command and thread
+        # wll probably want to have multiple batches on one thread 
+        # maxlen = 1000 # 21s
+        maxlen = 4000 # 16s
+        # maxlen = 10000 # 17s
+        # maxlen = 1000
         # batch = queue.Queue(2000)
-        batch = deque([], maxlen=1000) # probably better separating the maxlen from the queue when using collections.deque
+        # batches = [] #19s with 4x 1k size batches, ie slower than 1x 4k batch
+        batch = deque([], maxlen=maxlen) # probably better separating the maxlen from the queue when using collections.deque
+        # batches[0] = batch
+        # batch = []
+        # batch = [None] * maxlen
+        # i = 0
+        connected_here = False
         if not dbcon:
             dbcon = connect_to_db()
-        
+            connected_here = True
+
         create_db_table(fact_table_name, dbcon)
-        for line in file:
-            row = split_line(line)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            latest_future = None
+            # futures = deque()
+            for line in file:
+                row = split_line(line)
 
-            fact_line = row_func(row)
+                fact_line = row_func(row)
 
-            batch.append(fact_line)
-            if len(batch) == batch.maxlen:
-                save_batch(batch, dbcon, fact_table_name)
-                # dbcon.commit()
+                batch.append(fact_line)
+                # batch[i] = fact_line
+                if len(batch) == maxlen:
+                    # batches.append(batch)
+                    # previous_task = latest_task
+                    # if latest_task:# is not None:
+                    #     await latest_task
 
-        # save remaining items in the queue
-        if not len(batch) == 0:
-            save_batch(batch, dbcon, fact_table_name)
-        dbcon.commit()
-        dbcon.close()
+                    # if latest_future and not latest_future.done():
+                    #     latest_future.result(timeout=2)
+                    # if (len(batches) == 4):
+                        # save
+
+                    if latest_future:
+                        # wait up to 2 seconds for the last SQL INSERT to finish (or raise an Exception)
+                        latest_future.result(2)
+
+                    # if futures:
+                    #     # doesn't make sense to start firing the next SQL INSERT until the current one is finished
+                    #     try:
+                    #         futures[0].result(2)
+                    #         futures.popleft()
+                    #     except TimeoutError as te:
+                    #         print('save_batch Future did not finish within 2s timeout')
+                    #         print(te)
+                    #         raise te
+
+                    # latest_future = executor.submit(save_batch, batch, None, fact_table_name)
+                    # save_batch(batch, dbcon, fact_table_name)
+                    # latest_future = executor.submit(save_batches, batches, dbcon, fact_table_name)
+                    latest_future = executor.submit(save_batch, batch, dbcon, fact_table_name)
+                    # futures.append(latest_future)
+                    # batches = []
+
+
+
+                    # # todo there should be a cleaner way to write this
+                    # while futures:
+                    #     if futures[0].done():
+                    #         futures.popleft()
+                    #     else:
+                    #         break
+
+                    # latest_task = asyncio.create_task(save_batch_async(batch, dbcon, fact_table_name))
+                    # if previous_task:# is not None:
+                        # await previous_task
+                    
+                    # save_batch(batch, dbcon, fact_table_name)
+                    # await asyncio.sleep(1)
+                    # time.sleep(1)
+                    # await asyncio.sleep(0.1) # this fixes things for some reason (batch is empty otherwise)
+                    batch = deque([], maxlen=maxlen) # empty the queue
+                    # batch = [] 
+                    # batch = [None] * maxlen
+                    # i = 0
+                    # dbcon.commit()
+                # i += 1
+            # if latest_task:
+            #     await latest_task
+            # save remaining items in the queue
+            if not len(batch) == 0:
+
+            #     batches.append(batch)
+            # if batches:
+                # if latest_task:
+                #     await latest_task
+                # if futures:
+                    # not all futures finished
+                # if futures:
+                #         # while not futures[0].done():
+                #     try:
+                #         futures[0].result(2)
+                #         futures.popleft()
+                #     except TimeoutError as te:
+                #         print('save_batch Future did not finish within 2s timeout')
+                #         print(te)
+                #         raise te
+                if latest_future:
+                    latest_future.result(2)
+                # latest_future = executor.submit(save_batches, batches, dbcon, fact_table_name)
+                latest_future = executor.submit(save_batch, batch, dbcon, fact_table_name)
+                # futures.append(latest_future)
+
+            # if futures:
+            #     print('some futures not finished')
+            #     print(futures)
+            # for fut in concurrent.futures.as_completed(futures):
+            #     print(f'completed future {fut}')
+            #     fut.result(5)
+
+            latest_future.result(2)
+            # for fut in futures:
+            #     fut.result(2)
+            # print('completed all futures')
+            if (connected_here):
+                dbcon.commit()
+                dbcon.close()
     time1 = time.time()
     print(f'read handle and write took {time1-time0} seconds on file {os.path.basename(path)}.')
+    global total_insert_time
+    print(f'Inserting into fact table took a total of {total_insert_time} seconds')
+    pass
+
+# def batch_process(path, row_func, fact_table_name, dbcon = None):
+#     time0 = time.time()
+#     with open(path) as file:
+#         headers = next(file) # discard first row
+#         maxlen = 1000
+#         # batch = queue.Queue(2000)
+#         batch = deque([], maxlen=maxlen) # probably better separating the maxlen from the queue when using collections.deque
+#         # batch = []
+#         # batch = [None] * maxlen
+#         # i = 0
+
+#         if not dbcon:
+#             dbcon = connect_to_db()
+
+#         create_db_table(fact_table_name, dbcon)
+#         latest_task = None
+#         for line in file:
+#             row = split_line(line)
+
+#             fact_line = row_func(row)
+
+#             batch.append(fact_line)
+#             # batch[i] = fact_line
+#             if len(batch) == maxlen:
+#                 previous_task = latest_task
+#                 save_batch(batch, dbcon, fact_table_name)
+#                 batch = deque([], maxlen=maxlen)
+#                 # batch = [] 
+#                 # batch = [None] * maxlen
+#                 # i = 0
+#                 # dbcon.commit()
+#             # i += 1
+#         # save remaining items in the queue
+#         if not len(batch) == 0:
+#             save_batch(batch, dbcon, fact_table_name)
+#         dbcon.commit()
+#         dbcon.close()
+#     time1 = time.time()
+#     print(f'read handle and write took {time1-time0} seconds on file {os.path.basename(path)}.')
+#     global total_insert_time
+#     print(f'Inserting into fact table took a total of {total_insert_time} seconds')
+#     pass
+
+def batch_process(path, row_func, fact_table_name, dbcon=None):
+    # print(batch_process_async(path, row_func, fact_table_name, dbcon))
+    # asyncio.run(batch_process_async(path, row_func, fact_table_name, dbcon))
+    batch_process_threaded(path, row_func, fact_table_name, dbcon)
+    pass
 
 
+# todo move this to dimension class
 def save_dim(name, dbcon = None, unique_index :str = None):
     # values = [batch.popleft() for _ in range(len(batch))]
     if name not in table_info.ALLOWED_TABLES:
         raise 'Table name not allowed: ' + name
 
-    disconnect = False
+    db_connected_here = False
     if not dbcon:
         dbcon = connect_to_db()
-        disconnect = True
+        db_connected_here = True
 
 
     # values = [tuple(row[:-1])for row in dicts[name].values()]
     # values = [tuple(row[:])for row in dicts[name].dim_list]
-    values = dicts[name].dim_list
     # print(values)
-    headers = table_info.headers_dict[name][:-1]
+    headers = table_info.headers_dict[name]#[:-1]
+    values = [value + (idx,) for idx, value in enumerate(dicts[name].dim_list)]
 
     # headers = headers_dict[table_name]
     headers_str = '('+ ','.join(headers) + ')'
@@ -213,7 +414,7 @@ def save_dim(name, dbcon = None, unique_index :str = None):
 
     sql = f"INSERT INTO {name} {headers_str} VALUES {values_f_str}"
     
-    # print(values)
+    # print(values[:10])
     # print(sql)
     # print()
     # print(headers)
@@ -227,7 +428,8 @@ def save_dim(name, dbcon = None, unique_index :str = None):
         dbcon.cursor().execute(f'CREATE UNIQUE INDEX {unique_index} ON {name} ({unique_index})')
     dbcon.commit()
 
-    if disconnect:
+    
+    if db_connected_here:
         dbcon.close()
 
 def save_dims():

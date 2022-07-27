@@ -21,12 +21,38 @@ class Dimension(metaclass=abc.ABCMeta):
             self.indices_dict[key] = idx
             return idx
 
+    def to_sql(self, con):
+        raise Exception("Feature not implemented yet")
+
+    def __contains__(self, key):
+        return key in self.indices_dict
+
+    def __getitem__(self, key):
+        return self.dim_list[self.indices_dict[key]]
+
+    def __setitem__(self, key, values: tuple):
+        return self.add_if_not_in(key, values)
+        # self.dim_list[self.indices_dict[key]] = value
+
+    def __str__(self):
+        return f'{self.headers},\n{self.dim_list},\n{self.indices_dict}'
+
+    def keys(self):
+        return self.indices_dict.keys()
+
+    def values(self):
+        return self.dim_list
+
+    def items(self):
+        return [(k[0], self.dim_list[k[1]]) for k in self.indices_dict.items()]
+
+
 class SimpleDimension(Dimension):
     # headers = ('value')
 
-    def __init__(self) -> None:
+    def __init__(self, headers = ('value', )) -> None:
         super().__init__()
-        self.headers = ('value',)
+        self.headers = headers
 
     def add(self, row, col_index):
         val = row[col_index]

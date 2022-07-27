@@ -1,8 +1,9 @@
 import csv
 import shared_funcs
 
-temp_pop_dict = {}
+# temp_pop_dict = {}
 
+# i = 0
 def each_row(row):
     # loc_dict = shared_funcs.dicts['location']
     loc_raw = row[0]
@@ -10,10 +11,18 @@ def each_row(row):
 
     #turn "AB12 3 (part) Aberdeen City" to just "AB12 3" (do nothing if shorter)
     loc = loc_raw if len(loc_raw) <=6 else ' '.join(loc_raw.split(' ', 2)[:2])
-    temp_pop_dict[loc] = population
-    if loc in temp_pop_dict:
-        temp_pop_dict[loc] += population
+    cd = shared_funcs.dicts['census']
+    # global i
+    # if i<10:
+    #     print(cd)
+    if loc in cd:
+        cd[loc] = (loc, cd[loc][1] + population,)
+    else:
+        cd[loc] = (loc, population,)
     # print(f'handling loc {loc}, pop {population}')
+    # if (i<10):
+    #     print(cd)
+    # i += 1
     pass
 
 def add_up_sectors(dic):
@@ -35,7 +44,9 @@ def change_dict_structure(dic):
 
 
 def etl(fpath, table_name = 'census'):
+    # i = 0
     # shared_funcs.ensure_dim('location')
+    shared_funcs.ensure_dim_dicts(['census'])
 
     #probably don't do the shared_funcs function here
     # shared_funcs.read_and_handle(os.path.join(data_folder, file_name), each_row, None, skip_n_rows=5, skip_after_0_empty=True)
@@ -55,11 +66,12 @@ def etl(fpath, table_name = 'census'):
     # print(temp_pop_dict)
 
     # print (pd.DataFrame(zip(temp_pop_dict.keys(), temp_pop_dict.values()), columns=['loc', 'population']))
-    add_up_sectors(temp_pop_dict)
-    change_dict_structure(temp_pop_dict)
+    # add_up_sectors(shared_funcs.dicts['census'])
+    # change_dict_structure(shared_funcs.dicts['census'])
 
-    shared_funcs.dicts['census'] = temp_pop_dict
-    
+    # shared_funcs.dicts['census'] = temp_pop_dict
+    # print(shared_funcs.dicts['census'])
+
     shared_funcs.save_dim('census', dbcon=None, unique_index='location')
 
     # print (pd.DataFrame(zip(temp_pop_dict.keys(), temp_pop_dict.values()), columns=['loc', 'population']))

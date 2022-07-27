@@ -89,7 +89,7 @@ create_strings['time'] = (
     "year INT NOT NULL,"
     "quarter INT NOT NULL,"
     "month INT NOT NULL," # could also month_name varchar
-    "id INT NOT NULL AUTO_INCREMENT,"
+    "id INT NOT NULL,"
     "PRIMARY KEY (id)"
     ")")
 
@@ -99,14 +99,14 @@ create_strings['location'] = (
     "district VARCHAR(4),"
     "area VARCHAR(2),"
     "region VARCHAR(63),"
-    "id INT NOT NULL AUTO_INCREMENT,"
+    "id INT NOT NULL,"
     "PRIMARY KEY (id)"
     ")")
 
 create_strings['category'] = ( 
     "CREATE TABLE category ("
     "category VARCHAR(255) NOT NULL,"
-    "id INT NOT NULL AUTO_INCREMENT,"
+    "id INT NOT NULL,"
     "PRIMARY KEY (id)"
     ")")
 
@@ -120,14 +120,14 @@ create_strings['m_channel'] = (
 create_strings['purpose'] = ( 
     "CREATE TABLE purpose ("
     "purpose VARCHAR(63) NOT NULL,"
-    "id INT NOT NULL AUTO_INCREMENT,"
+    "id INT NOT NULL,"
     "PRIMARY KEY (id)"
     ")")
 
 create_strings['transport_mode'] = ( 
     "CREATE TABLE transport_mode ("
     "transport_mode VARCHAR(6) NOT NULL,"
-    "id INT NOT NULL AUTO_INCREMENT,"
+    "id INT NOT NULL,"
     "PRIMARY KEY (id)"
     ")")
 
@@ -135,7 +135,7 @@ create_strings['census'] = (
     "CREATE TABLE census ("
     "location VARCHAR(6) NOT NULL," # maybe longer later if needed total scotland
     "population INT NOT NULL,"
-    "id INT NOT NULL AUTO_INCREMENT,"
+    "id INT NOT NULL,"
     "PRIMARY KEY (id)"
     ")")
 
