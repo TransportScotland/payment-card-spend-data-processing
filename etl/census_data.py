@@ -4,21 +4,28 @@ import shared_funcs
 # temp_pop_dict = {}
 
 # i = 0
-def each_row(row):
+def each_row(row, population_dict):
     # loc_dict = shared_funcs.dicts['location']
     loc_raw = row[0]
     population = int(row[1].replace(',', ''))
 
     #turn "AB12 3 (part) Aberdeen City" to just "AB12 3" (do nothing if shorter)
     loc = loc_raw if len(loc_raw) <=6 else ' '.join(loc_raw.split(' ', 2)[:2])
-    cd = shared_funcs.dicts['census']
+
+    if loc in population_dict:
+        population_dict[loc] += population
+    else:
+        population_dict[loc] = population
+
+
+    # cd = shared_funcs.dicts['census']
     # global i
     # if i<10:
     #     print(cd)
-    if loc in cd:
-        cd[loc] = (loc, cd[loc][1] + population,)
-    else:
-        cd[loc] = (loc, population,)
+    # if loc in cd:
+    #     cd[loc] = (loc, cd[loc][1] + population,)
+    # else:
+    #     cd[loc] = (loc, population,)
     # print(f'handling loc {loc}, pop {population}')
     # if (i<10):
     #     print(cd)
@@ -46,11 +53,12 @@ def change_dict_structure(dic):
 def etl(fpath, table_name = 'census'):
     # i = 0
     # shared_funcs.ensure_dim('location')
-    shared_funcs.ensure_dim_dicts(['census'])
+    # shared_funcs.ensure_dim_dicts(['census'])
 
     #probably don't do the shared_funcs function here
     # shared_funcs.read_and_handle(os.path.join(data_folder, file_name), each_row, None, skip_n_rows=5, skip_after_0_empty=True)
     
+    population_dict = {}
     with open (fpath) as file:
         # skip first 6 rows - meta info plus a row of total scotland data
         for _ in range(6):
@@ -61,18 +69,27 @@ def etl(fpath, table_name = 'census'):
             if not row[0]:
                 # if empty first element
                 break
-            each_row(row = row)
+            each_row(row, population_dict)
             
     # print(temp_pop_dict)
 
+    import pandas as pd
+    import table_info
+
+    table_headers= table_info.headers_dict['census'] # location, population, id
+
+    df = pd.DataFrame(zip(population_dict.keys(), population_dict.values()), columns=table_headers[:-1])
+    # df.to_sql('census')
+    df.to_sql('census', shared_funcs.get_sqlalchemy_con(), index_label=table_headers[-1], if_exists='replace')
+    print(df)
     # print (pd.DataFrame(zip(temp_pop_dict.keys(), temp_pop_dict.values()), columns=['loc', 'population']))
     # add_up_sectors(shared_funcs.dicts['census'])
     # change_dict_structure(shared_funcs.dicts['census'])
 
     # shared_funcs.dicts['census'] = temp_pop_dict
     # print(shared_funcs.dicts['census'])
-
-    shared_funcs.save_dim('census', dbcon=None, unique_index='location')
+    
+    # shared_funcs.save_dim('census', dbcon=None, unique_index='location')
 
     # print (pd.DataFrame(zip(temp_pop_dict.keys(), temp_pop_dict.values()), columns=['loc', 'population']))
 

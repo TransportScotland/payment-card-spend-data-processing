@@ -393,40 +393,42 @@ def batch_process(path, row_func, fact_table_name, dbcon=None):
 # todo move this to dimension class
 def save_dim(name, dbcon = None, unique_index :str = None):
     # values = [batch.popleft() for _ in range(len(batch))]
-    if name not in table_info.ALLOWED_TABLES:
-        raise 'Table name not allowed: ' + name
+    # if name not in table_info.ALLOWED_TABLES:
+    #     raise 'Table name not allowed: ' + name
 
     db_connected_here = False
     if not dbcon:
         dbcon = connect_to_db()
         db_connected_here = True
 
+    dicts[name].to_sql(name, dbcon, unique_index)
 
-    # values = [tuple(row[:-1])for row in dicts[name].values()]
-    # values = [tuple(row[:])for row in dicts[name].dim_list]
-    # print(values)
-    headers = table_info.headers_dict[name]#[:-1]
-    values = [value + (idx,) for idx, value in enumerate(dicts[name].dim_list)]
 
-    # headers = headers_dict[table_name]
-    headers_str = '('+ ','.join(headers) + ')'
-    values_f_str = '(' + ','.join(['%s' for _ in range(len(headers))]) + ')'
+    # # values = [tuple(row[:-1])for row in dicts[name].values()]
+    # # values = [tuple(row[:])for row in dicts[name].dim_list]
+    # # print(values)
+    # headers = table_info.headers_dict[name]#[:-1]
+    # values = [value + (idx,) for idx, value in enumerate(dicts[name].dim_list)]
 
-    sql = f"INSERT INTO {name} {headers_str} VALUES {values_f_str}"
+    # # headers = headers_dict[table_name]
+    # headers_str = '('+ ','.join(headers) + ')'
+    # values_f_str = '(' + ','.join(['%s' for _ in range(len(headers))]) + ')'
+
+    # sql = f"INSERT INTO {name} {headers_str} VALUES {values_f_str}"
     
-    # print(values[:10])
-    # print(sql)
-    # print()
-    # print(headers)
-    # print(headers_str)
-    # print(values_f_str)
-    # print(dicts)
-    create_db_table(name, dbcon)
-    dbcon.cursor().executemany(sql, values)
+    # # print(values[:10])
+    # # print(sql)
+    # # print()
+    # # print(headers)
+    # # print(headers_str)
+    # # print(values_f_str)
+    # # print(dicts)
+    # create_db_table(name, dbcon)
+    # dbcon.cursor().executemany(sql, values)
 
-    if unique_index in headers:
-        dbcon.cursor().execute(f'CREATE UNIQUE INDEX {unique_index} ON {name} ({unique_index})')
-    dbcon.commit()
+    # if unique_index in headers:
+    #     dbcon.cursor().execute(f'CREATE UNIQUE INDEX {unique_index} ON {name} ({unique_index})')
+    # dbcon.commit()
 
     
     if db_connected_here:
@@ -443,6 +445,9 @@ def connect_to_db():
     # c = db.cursor()
     return db
 
+def get_sqlalchemy_con():
+    import sqlalchemy
+    return sqlalchemy.create_engine('mysql://', creator=connect_to_db)
 
 # def get_headers(dict_name):
 #     return dict_headers[dict_name]

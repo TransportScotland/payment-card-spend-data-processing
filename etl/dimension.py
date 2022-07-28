@@ -1,4 +1,4 @@
-import abc
+import abc #abstract classes
 
 
 class Dimension(metaclass=abc.ABCMeta):
@@ -21,8 +21,45 @@ class Dimension(metaclass=abc.ABCMeta):
             self.indices_dict[key] = idx
             return idx
 
-    def to_sql(self, con):
-        raise Exception("Feature not implemented yet")
+    # def add_index_to_list(lst):
+    #     return [value + (idx,) for idx, value in enumerate(lst)]
+
+    def to_sql(self, table_name, con, unique_index_column: None):
+        import table_info
+        if table_name not in table_info.ALLOWED_TABLES:
+            raise 'Table name not allowed: ' + table_name
+
+
+        # values = [tuple(row[:-1])for row in dicts[name].values()]
+        # values = [tuple(row[:])for row in dicts[name].dim_list]
+        # print(values)
+        # headers = table_info.headers_dict[table_name]#[:-1]
+        values = [value + (idx,) for idx, value in enumerate(self.dim_list)]
+        # add_index_to_list(self.dim_list)
+
+        headers = table_info.headers_dict[table_name]
+        headers_str = '('+ ','.join(headers) + ')'
+        values_f_str = '(' + ','.join(['%s' for _ in range(len(headers))]) + ')'
+
+        sql = f"INSERT INTO {table_name} {headers_str} VALUES {values_f_str}"
+        
+        # print(table_name)
+        # print(headers_str)
+        # print(values[:10])
+        # print(values)
+        # print(sql)
+        # print()
+        # print(headers)
+        # print(values_f_str)
+        # print(dicts)
+        import shared_funcs
+        shared_funcs.create_db_table(table_name, con)
+        con.cursor().executemany(sql, values)
+
+        if unique_index_column in self.headers:
+            con.cursor().execute(f'CREATE UNIQUE INDEX {unique_index_column} ON {table_name} ({unique_index_column})')
+        con.commit()
+        # raise NotImplementedError("Feature not implemented yet")
 
     def __contains__(self, key):
         return key in self.indices_dict
@@ -45,6 +82,7 @@ class Dimension(metaclass=abc.ABCMeta):
 
     def items(self):
         return [(k[0], self.dim_list[k[1]]) for k in self.indices_dict.items()]
+
 
 
 class SimpleDimension(Dimension):

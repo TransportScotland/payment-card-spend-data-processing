@@ -14,7 +14,7 @@ def etl(durations_matrix_files):
     # load in a durations matrix
     df = pd.read_csv(durations_matrix_file)
 
-    df = df.iloc[:100]
+    # df = df.iloc[:100]
 
     # load in census data to match location IDs
     locs = pd.read_sql(
@@ -70,28 +70,28 @@ def etl(durations_matrix_files):
         # con.execute('ALTER TABLE durations ADD PRIMARY KEY (origin, destination);')
         con.execute('ALTER TABLE durations ADD PRIMARY KEY (origin_id_census, destination_id_census);')
 
-        time3 = time.time()
-        secp1 = df['seconds'] + 1
-        df['secp1'] = secp1
-        df2 = df[['origin_id_census', 'destination_id_census', 'secp1']]
-        df.drop('secp1', 1)
+        time3 = time.time() # to be deleted
+        # secp1 = df['seconds'] + 1
+        # df['secp1'] = secp1
+        # df2 = df[['origin_id_census', 'destination_id_census', 'secp1']]
+        # df.drop('secp1', 1)
 
-        df2.to_sql(
-            'dur_temp', 
-            con=sqlcon, 
-            if_exists='replace', 
-            index=False, 
-            dtype={'destination_id_census': sqlalchemy.types.INT, 'origin_id_census': sqlalchemy.types.INT, 'secp1': sqlalchemy.types.FLOAT}
-            )
+        # df2.to_sql(
+        #     'dur_temp', 
+        #     con=sqlcon, 
+        #     if_exists='replace', 
+        #     index=False, 
+        #     dtype={'destination_id_census': sqlalchemy.types.INT, 'origin_id_census': sqlalchemy.types.INT, 'secp1': sqlalchemy.types.FLOAT}
+        #     )
 
-        con.execute("ALTER TABLE durations ADD COLUMN secp1 INT;")
-        con.execute("""UPDATE durations 
-            INNER JOIN dur_temp ON 
-                durations.origin_id_census = dur_temp.origin_id_census
-                AND durations.destination_id_census = dur_temp.destination_id_census
-            SET durations.secp1 = dur_temp.secp1
-            ;""")
-        con.execute("DROP TABLE IF EXISTS dur_temp;")
+        # con.execute("ALTER TABLE durations ADD COLUMN secp1 INT;")
+        # con.execute("""UPDATE durations 
+        #     INNER JOIN dur_temp ON 
+        #         durations.origin_id_census = dur_temp.origin_id_census
+        #         AND durations.destination_id_census = dur_temp.destination_id_census
+        #     SET durations.secp1 = dur_temp.secp1
+        #     ;""")
+        # con.execute("DROP TABLE IF EXISTS dur_temp;")
 
 
     time4 = time.time()
