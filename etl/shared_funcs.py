@@ -1,107 +1,87 @@
-import pandas as pd
+# Functions common to all four of the fact table processing scripts.
+# Most of the functionality is in here or at least goes through here.
+# This could likely be reused as a library for other ETL tasks by updating table_info.py and dimension.py to match different ETL tasks
+
+
+# import python libraries
 import os
 import time
-import csv
 import MySQLdb
-# import queue # adds a TON of overhead, only for multiprocessing
 from collections import deque
 
+# import my python modules
+import dimension
 import table_info
 
 
-dicts = {}
-dict_maxids = {}
-dict_headers = {}
+# dimension data structures like {name: dimension_object}
+dicts = {} #TODO rename this
 
+# for error handling, unused.
+error_rows = []
+# for expectedly skipped rows. currently also unused.
 skipped_rows = []
 
-def add_to_dict_if_not_in(dict_name, key, values: list):
-    if key not in dicts[dict_name]:
-        values.append(dict_maxids[dict_name])
-        dicts[dict_name][key] = values
-        dict_maxids[dict_name] = dict_maxids[dict_name] + 1
-        return values[-1]
-    else:
-        return dicts[dict_name][key][-1] # return id of new key
+# TODO consider renaming places where dim_dict is to just dimension and similar (this file's  object dicts)
 
-def handle_one_dim(dict_name, row, row_index):
-    val = row[row_index]
-    id = add_to_dict_if_not_in(dict_name, val, [val])
-    return id
+# mostly for backwards compatibility purposes atm
+def _new_dim_dict(name):
+    """
+    Create a dimension object and add it to this module's dimension dictionary under the name provided.
+    If name is 'time', creates TimeDimension, if 'location' LocationDimension, otherwise SimpleDimension.
 
+    Raises ValueError is a dimension with this name already exists in the dictionary.
+    """
 
-def postcode_sector_to_loc_list(sector: str):
-    # district = sector.rsplit(' ', maxsplit=1)[0]
-    district = sector[:-2]
+    # todo consider checking against table_info.ALLOWED_TABLES before creating
 
-    # first digit if second digit is number, else first two digits.
-    # to confirm if any postcodes areas are 3 chars (simple loop then)
-    area = district[0] if district[1].isnumeric() else district[0:2]
-
-    # region might have to be done differently (current only known one is scotland)
-    region = 'unknown'
-
-    return [sector, district, area, region]
-
-# removing increases speed by 15%
-def handle_time(row, index = 0):
-    time_raw = str(row[index]) #optional depending on stuff
-    if (not time_raw[0].isnumeric()):
-        # a quarter - skipping for now
-        raise
-    year = int(time_raw[:4]) #check if faster this or 202201 / 100 and 202201 % 100
-    month = int(time_raw[4:6])
-    quarter = int(month / 3)
-
-    # not sure if I actually need time_raw in the table but maybe there was a reason for it
-    time_id = add_to_dict_if_not_in('time', time_raw, [time_raw, year, quarter, month])
-    return time_id
-    
-# 15%
-def handle_loc(row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCODE_SECTOR'):
-    # there may be a better way to do this than a star schema
-    if row[loc_level_idx] != smallest_area_name:
-        # probably skip adding this line to the fact table.
-        # but do save it somewhere to check the sub-sections add up to the right number
-        # skip handling this until data is known
-        return -1
-    sector = row[loc_idx]
-    loc_list = postcode_sector_to_loc_list(sector)
-
-    id = add_to_dict_if_not_in('location', sector, loc_list)
-    return id
-
-
-def new_dim_dict(name):
-    # this lowkey begs for being a class
-    # definitely dict_info and maybe this whole file
     if name in dicts:
         raise ValueError(f'Dict with this name already exists: {name}')
-    dicts[name] = {}
-    dict_maxids[name] = 1 # sql starts id counting at 1
-    dict_headers[name] = table_info.headers_dict[name]
+    if name == 'time':
+        dicts[name] = dimension.TimeDimension()
+    elif name == 'location':
+        dicts[name] = dimension.LocationDimension()
+    else:
+        dicts[name] = dimension.SimpleDimension()
 
+
+# consider combining with _new_dim_dict into one
 def _ensure_dim_dict(name):
+    """Calls _new_dim_dict if a dimension with this name does not exist already."""
     if name not in dicts:
-        new_dim_dict(name)
+        _new_dim_dict(name)
 
-
-def ensure_dim_dicts(*dims_list):
-    # if type(dims_list) == list:
-    for dim in dims_list:
-        if type(dim) == list or type(dim) == tuple:
-            # unwrap list or tuple arguments (not all iterables)
-            for d in dim:
-                _ensure_dim_dict(d)
+# consider stopping supporting this functionality, it's not even that important
+def _unwrap_wrap_args(*args):
+    """Turns arguments like ('a', ['b', 'c'], 'd') into list ['a', 'b', 'c', 'd']."""
+    out = []
+    for arg in args:
+        if type(arg) == list or type(arg) == tuple:
+            for element in arg:
+                out.append(element)
         else:
-            _ensure_dim_dict(dim)
+            out.append(arg)
+    return out
+
+def ensure_dim_dicts(*dimension_names):
+    """
+    Creates dimension objects if ones with this name do not exist yet.
+    Expected names of dimensions are in table_info.ALLOWED_TABLES.
+    """
+    
+    # in retrospect, accepting either a list or a *args instead of just one of them is a weird way to do things.
+    dims_list = _unwrap_wrap_args(dimension_names)
+    for dim in dims_list:
+        _ensure_dim_dict(dim)
 
 
 def split_line(line):
+    """Remove trailing whitespace and split on every comma"""
     return line.rstrip().split(',')
 
 
 def create_db_table(table_name, dbcon, drop_if_exists = True):
+    """Create a table in the database using table_info.create_string[table_name]."""
     c = dbcon.cursor()
     if (drop_if_exists):
         # maybe be more carfeul with dropping in production
@@ -111,254 +91,184 @@ def create_db_table(table_name, dbcon, drop_if_exists = True):
     c.execute(table_info.create_strings[table_name])
 
 
+def __raise_not_numeric(row_cell, row):
+    raise ValueError('All elements in the fact table must be numerical to prevent SQL injection attacks.' +
+        f'Instead found: element {row_cell} of type {type(row_cell)} in row {row}')
 
+
+def _raise_if_not_int_float(list_of_rows):
+    for row in list_of_rows:
+        for row_cell in row:
+            if(not(type(row_cell) == int or type(row_cell) == float)):
+                # raise an exception if not a number but chceck numeric strings
+                if (type(row_cell) == str):
+                    try:
+                        # throw a ValueError if string not convertible to float
+                        _ = float(row_cell)
+                    except ValueError:
+                        __raise_not_numeric(row_cell, row)
+                else:
+                    __raise_not_numeric(row_cell, row)
 
 def save_batch(batch, dbcon, table_name):
-    values = [batch.popleft() for _ in range(len(batch))]
+    """
+    Save a batch of fact table rows into the database.
 
+    CAREFUL: MAY be susceptible to SQL injection attacks. 
+        Does not use existing library functions to escape any characters but only accepts int or float.
+        So should be safe but do procees with caution.
+    """
+
+    values = batch
+
+    # prepare the headers part of the SQL query
     headers = table_info.headers_dict[table_name]
     headers_str = '('+ ','.join(headers) + ')'
-    values_f_str = '(' + ','.join(['%s' for _ in range(len(headers))]) + ')'
-    values_f_str = '' # constructing a full command instead of parameters
 
-    sql = f"INSERT INTO {table_name} {headers_str} VALUES {values_f_str}"
-    # dbcon.cursor().executemany(sql, values)
+    sql_base = f"INSERT INTO {table_name} {headers_str} VALUES "
 
-    # may need to escape if anything other than numbers comes in.
-    # this is where it would've been useful to have types
-    # values_str = ','.join(['('+','.join([dbcon.escape_string(str(e)).decode('ascii') for e in v]) + ')' for v in values])
-    assert(all(type(e) for e in (int, float) for row in values for e in row))
+    # raise an Exception if anything of type other than (float, int) comes in
+    # be very careful removing the following line, will need to escape string if anything other than numbers comes in.
+    _raise_if_not_int_float(values)
 
+    # each row in values is a tuple so str(v) is (e1, e2, e3, ...) already, and just put commas in between each
     values_str = ','.join([str(v) for v in values])
-    bigsql = sql + values_str
-    dbcon.cursor().execute(bigsql)
-
-
-def batch_process(path, row_func, fact_table_name, dbcon = None):
-    time0 = time.time()
-    with open(path) as file:
-        headers = next(file) # discard first row
-        # batch = queue.Queue(2000)
-        batch = deque([], maxlen=1000) # probably better separating the maxlen from the queue when using collections.deque
-        if not dbcon:
-            dbcon = connect_to_db()
-        
-        create_db_table(fact_table_name, dbcon)
-        for line in file:
-            row = split_line(line)
-
-            fact_line = row_func(row)
-
-            batch.append(fact_line)
-            if len(batch) == batch.maxlen:
-                save_batch(batch, dbcon, fact_table_name)
-                # dbcon.commit()
-
-        # save remaining items in the queue
-        if not len(batch) == 0:
-            save_batch(batch, dbcon, fact_table_name)
-        dbcon.commit()
-        dbcon.close()
-    time1 = time.time()
-    print(f'read handle and write took {time1-time0} seconds on file {os.path.basename(path)}.')
-
-
-def save_dim(name, dbcon = None, unique_index :str = None):
-    # values = [batch.popleft() for _ in range(len(batch))]
-    if name not in table_info.ALLOWED_TABLES:
-        raise 'Table name not allowed: ' + name
-
-    disconnect = False
-    if not dbcon:
-        dbcon = connect_to_db()
-        disconnect = True
-
-
-    values = [tuple(row[:-1])for row in dicts[name].values()]
-    headers = table_info.headers_dict[name][:-1]
-
-    # headers = headers_dict[table_name]
-    headers_str = '('+ ','.join(headers) + ')'
-    values_f_str = '(' + ','.join(['%s' for _ in range(len(headers))]) + ')'
-
-    sql = f"INSERT INTO {name} {headers_str} VALUES {values_f_str}"
+    bigsql = sql_base + values_str
+    if values_str == "":
+        raise Exception("batch was empty in save_batch")
     
-    create_db_table(name, dbcon)
-    dbcon.cursor().executemany(sql, values)
-
-    if unique_index in headers:
-        dbcon.cursor().execute(f'CREATE UNIQUE INDEX {unique_index} ON {name} ({unique_index})')
+    dbcon.cursor().execute(bigsql)
     dbcon.commit()
 
-    if disconnect:
+def save_batch_timed(*args):
+    """Call save_batch and time how long it took"""
+    start_time = time.time()
+    save_batch(*args)
+    end_time = time.time()
+    return end_time - start_time
+
+
+import concurrent.futures
+def batch_process_threaded(path, row_func, fact_table_name, dbcon: None):
+    start_time = time.time()
+    with open(path) as file:
+        _ = next(file) # discard first row (headers)
+        maxlen = 4000 # 16s. 1000 21s, 10000 17s
+        batch = deque([], maxlen=maxlen)
+        # also consider multiprocessing Queue - one shared queue between threads, and just save as it fills up (or like a queue of batches even)
+
+        # connect if dbcon is null
+        connected_here = False
+        if not dbcon:
+            dbcon = connect_to_db()
+            connected_here = True
+
+        create_db_table(fact_table_name, dbcon)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            latest_future = None
+            total_insert_time = 0
+
+            for line in file:
+                # also option of using csv.reader - slower but handles quotation marks around cells
+                row = split_line(line)
+
+                fact_line = row_func(row)
+
+                batch.append(fact_line)
+                if len(batch) == maxlen:
+
+                    if latest_future:
+                        # wait up to 2 seconds for the last SQL INSERT to finish (or raise an Exception)
+                        time_taken = latest_future.result(2)
+                        total_insert_time += time_taken
+
+                    latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
+                    batch = deque([], maxlen=maxlen) # empty the queue here
+
+            # wait for last save task to finish
+            if latest_future:
+                time_taken = latest_future.result(2)
+                total_insert_time += time_taken
+
+            # save items left in the queue after finished reading the file (e.g. if there are 9500 rows and batches are size 1000, 500 left at the end)
+            if not len(batch) == 0:
+                latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
+                time_taken = latest_future.result(2)
+                total_insert_time += time_taken
+
+            # close connection if connected here
+            if (connected_here):
+                dbcon.close()
+    end_time = time.time()
+    print(f'read handle and write took {end_time - start_time} seconds on file {os.path.basename(path)}.')
+    print(f'Inserting into fact table took a total of {total_insert_time} seconds')
+    pass
+
+
+# TODO rename this
+def batch_process(path, row_func, fact_table_name, dbcon=None):
+    """Process file at path. See batch_process_threaded"""
+    batch_process_threaded(path, row_func, fact_table_name, dbcon)
+    pass
+
+
+def save_dim(name, dbcon = None):
+    """Wrapper for Dimension.to_sql, also creates connection if dbcon null"""
+    db_connected_here = False
+    if not dbcon:
+        dbcon = connect_to_db()
+        db_connected_here = True
+
+    dicts[name].to_sql(name, dbcon)
+    if db_connected_here:
         dbcon.close()
 
 def save_dims():
+    """Save all the created dimensions into SQL database"""
     dbcon = connect_to_db()
     for name in dicts.keys():
         save_dim(name, dbcon)
     dbcon.close()
 
+# TODO make this adjustable
 def connect_to_db():
+    """Get MySQLdb connection to default database."""
     db = MySQLdb.connect(user='temp_user', passwd = 'password', database='sgov')
     # c = db.cursor()
     return db
 
+def get_sqlalchemy_con():
+    """Get SQLAlchemy engine for the database"""
+    import sqlalchemy
+    return sqlalchemy.create_engine('mysql://', creator=connect_to_db)
+
+
+# A lot of wrapper functions which are mostly here for historic purposes. But may be good to keep anyway in case changes are wanted.
+
+def add_to_dict_if_not_in(dict_name, key, values: list):
+    """Wrapper function for dimension.add_if_not_in. Takes in name of dim as stored in dicts here"""
+    return dicts[dict_name].add_if_not_in(key, values)
+
+ 
+def handle_one_dim(dict_name, row, row_index):
+    """Wrapper for SimpleDimension.add_row. Takes in name of dim as stored in dicts here"""
+    return dicts[dict_name].add_row(row, row_index)
+
+def handle_time(row, index = 0):
+    """Wrapper for TimeDimension.add_row. Takes in name of dim as stored in dicts here"""
+    return dicts['time'].add_row(row, index)
+
+def handle_loc(row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCODE_SECTOR'):
+    """Wrapper for LocationDimension.add_row. Takes in name of dim as stored in dicts here"""
+    return dicts['location'].add_row(row, loc_level_idx, loc_idx, smallest_area_name)
+
+# consider removing
+def postcode_sector_to_loc_list(sector: str):
+    """Wrapper for LocationDimension.postcode_sector_to_loc_list."""
+    return dimension.LocationDimension.postcode_sector_to_loc_list(sector)
 
 def get_headers(dict_name):
-    return dict_headers[dict_name]
+    """Get the headers of a given dimension"""
+    return dicts[dict_name].headers
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# (python has no built-in deprecated tag without installing a package so keeping these here for now)
-# depracated:
-
-def dict_to_df(dict_name):
-    return pd.DataFrame(data= dicts[dict_name].values(), columns = dict_headers[dict_name])
-
-def list_to_df(list, headers):
-    return pd.DataFrame(data=list, columns=headers)
-
-def dims_to_csv(folder):
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
-    for name in dicts.keys():
-        df = dict_to_df(name)
-        df.to_csv(os.path.join(folder, f'{name}.csv'))
-
-def list_to_csv(list, headers, folder, name):
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-    df = list_to_df(list, headers)
-    df.to_csv(os.path.join(folder, name), index = False)
-
-
-
-# maybe use a generator instead
-def read_and_handle(path, row_func, fact_list, skip_n_rows = 1, skip_after_0_empty = False):
-    time0 = time.time()
-    skipped_rows_added = False
-    with open(path) as file:
-        for i in range(skip_n_rows):
-            headers = file.__next__().rstrip().split(',')#[1:] #skipping col 0 for now
-            # print(headers)
-
-        # using csv reader slows down execution by like 30% - from 5.2s to 7.2s
-        # but it is somewhat necessary for the census data
-        
-        csvreader = csv.reader(file)
-        for row in csvreader:
-        # for line in file:
-            # stripped = line.strip()
-            # row = stripped.split(',')#[1:]
-            # print(stripped) 
-            if skip_after_0_empty and not row[0]:
-                break
-            try:
-                row_func(row, fact_list)
-            except Exception as e:
-                # todo make my own exceptions to not mix them up with built-in ones
-                print(e)
-                if not skipped_rows_added:
-                    skipped_rows.append(f'#### Skipped rows of {path}:')
-                    skipped_rows_added = True
-                skipped_rows.append(row)
-
-    time1 = time.time()
-    print(f'read and handle took {time1-time0} seconds on file {os.path.basename(path)}.')
-        # if skipped_rows:
-        #     print()
-        #     print('skipped rows:')
-        #     for r in skipped_rows:
-        #         print(r)
-
-
-def save_batch_csv(batch, path):
-    def row_to_saveable(row):
-        return ','.join([str(e) for e in row]) + '\n'
-    # save_lines = [','.join(str(batch.get_nowait())) for _ in range(batch.qsize())]
-    # save_lines = [','.join(row) for row in batch]
-    # save_str = '\n'.join(save_lines)
-    # save_lines = [row_to_saveable(batch.popleft()) for _ in range(len(batch))]
-    save_lines = [row_to_saveable(batch.popleft()) for _ in range(len(batch))]
-    # save_lines = [row_to_saveable(batch.get_nowait()) for _ in range(batch.qsize())]
-    # print(save_lines)
-    with open(path, 'a') as file:
-        #probably instead open the file/connection at the beginning and close at the end
-        # file.write(save_str)
-        file.writelines(save_lines)
-
-def save_csv_headers(path, headers):
-    with open(path, 'w') as file:
-        file.write(f'{",".join(headers)}\n')
-
-
-# there is probably a better way to have both csv and mysql without this much code duplication
-def batch_process_csv(path, row_func, fact_headers, out_fpath):
-    time0 = time.time()
-    with open(path) as file:
-        headers = next(file) # discard first row
-        batch = deque([], maxlen=1000) # probably better separating the maxlen from the queue
-        fact_headers = ('id',) + fact_headers
-        i=0
-        save_csv_headers(out_fpath,fact_headers)
-        for line in file:
-            row = split_line(line)
-            fact_line = row_func(row) 
-            fact_line = (str(i),) + fact_line
-            i+=1
-            batch.append(fact_line)
-            if len(batch) == batch.maxlen:
-                # prefer to handle this by catching a queue full exception
-                save_batch_csv(batch, out_fpath)
-
-        # save remaining items in the queue
-        if not len(batch) == 0:
-            save_batch_csv(batch, out_fpath)
-    time1 = time.time()
-    print(f'read handle and write took {time1-time0} seconds on file {os.path.basename(path)}.')
-
-
-# def new_dim_dict_old(name, headers):
-#     # this lowkey begs for being a class
-#     # definitely dict_info and maybe this whole file
-#     if name in dicts:
-#         raise ValueError(f'Dict with this name already exists: {name}')
-#     dicts[name] = {}
-#     dict_maxids[name] = 0
-#     dict_headers[name] = headers
-
-# def ensure_dim_old(name, headers):
-#     if name in dicts:
-#         if name not in dict_headers:
-#             raise "Mismanaged dim dictionaries: name in dicts but not in dict_headers"
-#             # maybe only print error and don't raise
-#         old_headers = dict_headers[name]
-#         if headers != old_headers:
-#             raise ValueError(f'New headers do not match old headers. Old: {old_headers}; new: {headers}')
-#     else:
-#         #name not in dicts -> add
-#         new_dim_dict(name, headers)
-
-
-# # temporary
-# def ensure_dim(dim, _):
-#     _ensure_dim_dict(dim)
-
-# def ensure_dims(dims_list):
-#     for dim in dims_list:
-#         ensure_dim(dim[0], dim[1])
