@@ -1,28 +1,32 @@
 import shared_funcs
 
-# fact_headers = ['perc_jour', 'perc_pan', 
-#     'time_id', 'merchant_id', 'transport_mode_id']
 
-
-# def create_dims(row, fact_list):
+# fact_headers = ['perc_jour', 'perc_pan', 'time_id', 'merchant_id', 'transport_mode_id']
 def create_dims(row):
-    time_id = shared_funcs.handle_time(row) # can keep
-    
-    # print(row)
+    """
+    Transform a row of the File 4 CSV into a fact table row, also filling up dimensions.
+    """
+
+
+    # dimensions and measures
+    time_id = shared_funcs.handle_time(row)
     merchant_id = shared_funcs.handle_loc(row, 1, 2, 'POSTCODE_SECTOR')
+    # todo handle this differently
     if merchant_id == -1:
-        # probably better throw an exception instead of -1. but check performance
         raise
     transport_mode_id = shared_funcs.handle_one_dim('transport_mode',row, 3)
 
     perc_jour = row[4]
     perc_pan = row[5]
+    # return fact table row as tuple
     return (perc_jour, perc_pan, time_id, merchant_id, transport_mode_id)
-    # fact_list.append([perc_jour, perc_pan, time_id, merchant_id, transport_mode_id])
 
 
 
 def etl(in_path, fact_table_name = 'fact4'):
+    """
+    Start the ETL process for File 4 of the card data.
+    """
     # shared_funcs.ensure_dim('time', ['raw', 'year', 'quarter', 'month', 'id'])
     # shared_funcs.ensure_dim('location',['sector', 'district', 'area', 'region', 'id'])
     # shared_funcs.ensure_dim('transport_mode', ['transport_mode', 'id'])

@@ -113,7 +113,7 @@ create_strings['category'] = (
 create_strings['m_channel'] = ( 
     "CREATE TABLE m_channel ("
     "m_channel VARCHAR(31) NOT NULL,"
-    "id INT NOT NULL AUTO_INCREMENT,"
+    "id INT NOT NULL,"
     "PRIMARY KEY (id)"
     ")")
 

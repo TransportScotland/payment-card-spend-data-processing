@@ -146,6 +146,8 @@ Time inserting (with transformations) of 1 million rows:
 * Dask (experimental/file1_dask.py):   55 seconds (38 of that is uploading fact table to_sql)
 * my row-wise solution (etl/file1.py): 18 seconds
 
+* 4 batches of 1k ended up slower than 1 batch of 4k for each thread
+
 
 Time to convert two rows into dict-like Series (index is key, value is value):
 > \>>> timeit.timeit("df.set_index('ids')['vals']", "import pandas as pd; df = pd.DataFrame({'ids':range(10), 'vals':list('ABCDEFGHIJ')})", number=1000)  
