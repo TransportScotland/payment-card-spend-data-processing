@@ -31,6 +31,8 @@ distances.etl(['generated_data/durations_matrix.csv']) # needs to be run after c
 # save the dimensions into the database. This needs to be called, otherwise the database will have only the fact tables
 shared_funcs.save_dims()
 
+census_data.move_to_locations()
+
 # stop timer and print total time taken
 time1 = time.time()
 print(f'The extract, transform, and load process took {time1-time0} seconds.')
