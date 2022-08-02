@@ -110,6 +110,14 @@ def etl(fpath):
     pop_df = save_to_sql(population_dict)
     print(pop_df)
 
+# consider doing this before putting all the locations into sql - or just have the census dict be the main location table
+def move_to_locations():
+    eng = shared_funcs.get_sqlalchemy_con()
+    with eng.connect() as con:
+        con.execute("alter table location add column population int;")
+        con.execute("update location l left join census c on l.sector = c.location set l.population = c.population;")
+
+
 # call the etl function if this file is run as a stand-alone program
 if __name__ == '__main__':
     etl('other_data/KS101SC.csv')
