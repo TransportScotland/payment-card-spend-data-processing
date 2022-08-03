@@ -56,12 +56,19 @@ def gen_file1(num_rows = 10):
     df['merchant_location'] = rand_postcode_sector_column(num_rows)
     df['pan_cnt'] = np.random.randint(15, 100, num_rows)
     df['txn_cnt'] = df['pan_cnt'] * (np.random.uniform(1,3, num_rows))
+    df['txn_cnt'] = df['txn_cnt'].astype(int)
     df['txn_gbp_amt'] = np.random.uniform(300, 3000, num_rows)
 
-    # set 10% samples to have same cardholder and merchant - for better visualisation
+
+    # set 10% samples to have same cardholder and merchant - for showing up in visualisations
     # remove if actual randomness desired
     df.loc[df['cardholder_location'].sample(int(num_rows/10)).index,
         'merchant_location'] = df['cardholder_location']
+    
+    # set random selection of sectors to actually be just districts
+    rand_index = df.sample(int(num_rows/20)).index
+    df.loc[rand_index, 'merchant_location'] = df['merchant_location'].str[:-2]
+    df.loc[rand_index, 'merchant_location_level'] = 'POSTCODE_DISTRICT' 
     return df
 
 def gen_file2(num_rows = 10):
@@ -78,6 +85,7 @@ def gen_file2(num_rows = 10):
     df['cardholder_location'] = np.core.defchararray.add('EH2 ', np.random.randint(0, 10, num_rows).astype(str))
     df['pan_cnt'] = np.random.randint(10, 10000, num_rows)
     df['txn_cnt'] = df['pan_cnt'] * (np.random.uniform(1,2, num_rows))
+    df['txn_cnt'] = df['txn_cnt'].astype(int)
     df['txn_gbp_amt'] = np.random.uniform(1000, 1e6, num_rows)
     df['merchant_outlet_cnt'] = np.random.randint(10, 1000, num_rows)
     df['percent_repeat'] = np.random.normal(0.5, 0.1, num_rows)
@@ -96,6 +104,7 @@ def gen_file3(num_rows = 10):
     df['jour_purpose'] = np.random.choice(['WINE & DINE', 'SHOPPING SPREE', 'OTHERS', 'ENTERTAINMENT'], num_rows)
     df['pan_cnt'] = np.random.randint(5000, 110000, num_rows)
     df['txn_cnt'] = df['pan_cnt'] * (np.random.uniform(1,3, num_rows))
+    df['txn_cnt'] = df['txn_cnt'].astype(int)
     df['txn_gbp_amt'] = np.random.uniform(1e5, 5e6, num_rows)
     df['Day_of_week'] = np.random.choice(['WEEKDAY', 'SATURDAY', 'SUNDAY'], num_rows)
     return df
@@ -118,7 +127,7 @@ def gen_file4(num_rows = 10):
 
 pd.options.display.max_columns = 20 # let pandas display more columns
 np.random.seed(0) # setting the seed for some reproducibility later
-file1 = gen_file1(int(1e6))
+file1 = gen_file1(int(1e4))
 # print(file1)
 
 np.random.seed(0)
@@ -134,7 +143,7 @@ file4 = gen_file4(1700)
 # print(file4)
 
 os.makedirs('data', exist_ok=True)
-file1.to_csv('data/file1.csv', index=False)
+file1.to_csv('data/file1_pa_1e4.csv', index=False)
 file2.to_csv('data/file2.csv', index=False)
 file3.to_csv('data/file3.csv', index=False)
 file4.to_csv('data/file4.csv', index=False)

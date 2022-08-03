@@ -188,3 +188,46 @@ Time to convert two rows into dict-like Series (index is key, value is value):
 * web interfaces seem to be in /web-bundle/.../graphhopper/resources/*Resource.java
     * but please don't use the web interface, it takes forever.
     * fun fact, the ORS matrix service took about 45 seconds on localhost to get a matrix of roughly ~1,200,000, GH public transit individual routes are taking 45 MINUTES to get 19,200 routes - some of it might be in the harder public transit routing, but I'd guess most of it will be in the interface (sending and receiving  19200 individual requests rather than a single long one)
+
+
+# What to do with partially aggregated rows:
+* on encountering a postcode_district row:
+    * save it for later (hopefully memory should be enough?)
+* once all done reading in:
+    * go through saved (district) rows and for each one:
+        * find all fact table rows where sector is in district. origin also matches (may also need to match date ranges)
+            * (this means find IDs of locs where sector[:-2] = district_destination, and where sector=origin. And then select from fact1 where loc is one of those IDs)
+        * sum up measures values of the found rows with the sector matching
+        * subtract the summed found sectors from district row values
+        * save this as row_other (maybe also _time, or _ list of missing value sectors eg _EH1-6_EH1-7_EH1-8 if EH1 1 through 5 were present)
+        * still to deal with: distances and population
+        * average out distances somehow. If they are in the fact table, probably just get avg(distance) of missing. (The relevant values will not be in the fact table). If they are separate, get distances for all matched IDs/sectors and average out those. This will require distance table to be fully full with every NxN journey, huge matrix. Maybe just get distances for districts somehow instead of every single sector
+            * maybe only do distances after (separately)
+        * population is summed across the matched missing sectors
+
+Really rethink what problem I'm trying to solve here. Do I really need to do all this work. And is there more sector info than district info etc.
+
+How about separate sector district area dimensions instead of a location one 
+
+_other is not an option. why? because each dest district has many origin sectors, and those origin sectors may each have a different selection of dest sectors (eg. DD1 1 may have data for EH3 1 and EH3 2 but not the rest, and KY1 1 may have data for EH3 7 and EH3 8 but not EH3 1 or EH3 2. therefore EH3_other would be different for every origin sector.)
+so instead probably best estimating sector values, weighed by sector population.
+But that produces ENORMOUS data. (150 mil sector-to-sector rows, which would take ~30GB space, and that's just one month)
+So I don't think getting around the aggreg limitations from this angle is the way to do it.
+Maybe just have values for overall and areas and districts and sectors separately, but smaller data that way, also inconsistency across destination sectors so they cannot be compared
+
+How about just replace the value where district row would be with district minus sum(subsectors)?
+Then I don't have a district_other value and only a district value, which should be okay???
+    What does that break? 
+    Measure values - should stay consistent and become aggregable
+    Shape file stay full size and are just drawn under the sectors - hopefully okay.
+    Distances will need extra row of avg distance per district sectors
+    population - should be fine because added up over sectors. but might have to put population as 0 in the location table row
+
+ie select sum where origin sector is same and destination district is curr_district, subtract that from measure, for all measures, and save into db as new row
+
+This might actually be okay to save for after the data arrives in case they already have done that
+
+
+
+# Things to discuss with Andy:
+* form of final report - passive or active form (I did thing or thing was done)

@@ -16,11 +16,14 @@ time0 = time.time()
 
 # call each of the files' relevant ETL function to read the file, transform it, and load into the database
 # first deal with the main data sets of card data
-# file1.etl('data/file1_1e4.csv') # smaller file for testing purposes
-file1.etl('data/file1.csv')
+file1.etl('data/file1_pa_1e4.csv') # smaller file for testing purposes
+# file1.etl('data/file1.csv')
 file2.etl('data/file2.csv')
 file3.etl('data/file3.csv')
 file4.etl('data/file4.csv')
+
+# subtract sums of sector values from district values
+file1.fix_districts()
 
 # combine with other datasets
 # TODO add --reload-distances flag (or other datasets) to not load in distances every time (default False, maybe also do a check if exists in db)

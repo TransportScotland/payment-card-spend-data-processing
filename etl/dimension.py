@@ -50,11 +50,29 @@ class Dimension(metaclass=abc.ABCMeta):
         import shared_funcs
         shared_funcs.create_db_table(table_name, con)
         # executemany can be very fussy so this may be a good place to print things before sending if things go wrong 
+        # print(sql)
+        # print(values[:10])
         con.cursor().executemany(sql, values)
 
         # if unique_index_column in self.headers:
         #     con.cursor().execute(f'CREATE UNIQUE INDEX {unique_index_column} ON {table_name} ({unique_index_column})')
         con.commit()
+
+    @classmethod
+    def _from_dict(cls, dic, headers):
+        """
+        Creates a dimension from a dict like
+        {key: (row_item1, row_item2, ...)}
+        """
+        new = Dimension()
+        new.headers = headers
+        for key, row in dic.items():
+            id = new.add_if_not_in(key, row)
+        return new
+        # # possible alt option:
+        # items = dic.items()
+        # new.dim_list = [v for k, v in items]
+        # new.indices_dict = {k: i for i, (k, v) in enumerate(items)}
 
     # override functions to make this class's interface work a lot like a dictionary
     def __contains__(self, key):
@@ -95,6 +113,19 @@ class SimpleDimension(Dimension):
         id = self.add_if_not_in(val, (val,))
         return id
 
+    
+    @classmethod
+    def from_dict_after_make_tuples(cls, dic, headers = ('value',)):
+        """
+        Creates a dimension from a dict like
+        {key: value}
+        """
+        tupled_dict = {k: (k, v,) for k,v in dic.items()}
+        return cls._from_dict(tupled_dict, headers)
+
+class DistrictException(Exception):
+    pass
+
 class LocationDimension(Dimension):
     """
     A dimension for postcode sector locations
@@ -128,9 +159,11 @@ class LocationDimension(Dimension):
         Add an element from row at loc_idx to this dimension's table, if the value at loc_level_idx is smallest_area_name.
         Splits up postcode sectors to district and area parts too
         """
-        if row[loc_level_idx] != smallest_area_name:
+        if row[loc_level_idx] != smallest_area_name and row[loc_level_idx][-6:] != '_DEAGG':
             # row is not of POSTCODE_SECTOR. TODO deal with this in a better way
+            raise DistrictException(f'Row at index {loc_level_idx} expected {smallest_area_name}, but got {row[loc_level_idx]}')
             return -1
+
         sector = row[loc_idx]
         loc_list = self.postcode_sector_to_loc_list(sector)
 
