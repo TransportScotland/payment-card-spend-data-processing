@@ -103,7 +103,128 @@ def save_to_sql(population_dict):
     # df.to_sql('census', shared_funcs.get_sqlalchemy_con(), index_label=table_headers[-1], if_exists='replace')
     return df
 
-def etl(fpath):
+def etl(postcode_fpath, census_fpath):
+    # might actually be better using pandas here than my own solution because I'm merging two tables
+    import pandas as pd
+    
+    dfp = pd.read_csv(postcode_fpath, header=None)
+    dfp = dfp[[0,1,2,6,7,8,9,12,13,14]]
+    dfp = dfp.rename(columns={0: 'postcode', 1: 'status', 2: 'usertype', 6:'country', 7:'lat', 8:'lng', 
+        9:'postcode_no_space', 12: 'area', 13:'district', 14:'sector'})
+    print(dfp)
+
+    dfp = dfp[dfp['status'] == 'live']
+    dfp = dfp[dfp['usertype'] == 'small']
+    print(dfp)
+
+
+    avg_locs = dfp.groupby('sector')[['lat', 'lng']].mean()
+    print(avg_locs)
+    # avg_lats = dfp.groupby('sector')['lat'].mean()
+    # avg_lngs = dfp.groupby('sector')['lng'].mean()
+    # print(avg_lats)
+    # print(avg_lngs)
+
+    dfp = dfp.drop_duplicates(subset='sector', keep='first')
+    dfp = dfp[['status', 'country', 'area', 'district', 'sector']]
+    dfp = dfp.merge(avg_locs, left_on='sector', right_index=True)
+    # dfp = dfp.merge(avg_lats, left_on=14, right_index=True)
+    # dfp = dfp.merge(avg_lngs, left_on=14, right_index=True)
+
+
+    print(dfp)
+    
+
+    dfc = pd.read_csv(census_fpath, header=None, skiprows=6, thousands=',')
+    dfc = dfc[:-4]
+    dfc = dfc[[0,1,2,3,7]]
+    dfc = dfc.rename(columns={0: 'sector', 1:'population', 2:'pop_male', 3: 'pop_female', 7: 'area_size'})
+    dfc = dfc.convert_dtypes() # make it stop converting ints to object by converting 'int' to 'Int64'
+    # dfc['population'] = dfc['population'].astype(int)
+    # dfc['pop_male'] = dfc['pop_male'].astype(int)
+    # dfc['pop_female'] = dfc['pop_female'].astype(int)
+    # dfc['area_size'] = dfc['area_size'].astype(int)
+
+    # dfc_mix = dfc[dfc['sector'].str.len() > 7]
+    # print(dfc_mix)
+    dfc['sector'] = dfc['sector'].str.extract(r'(\b\w\w?\d[\d\w]? \d)')
+    print(dfc)
+    print(dfc.dtypes)
+    dfc = dfc.groupby('sector')[['population', 'pop_male', 'pop_female', 'area_size']].sum()
+    print(dfc)
+    dfc = dfc.reset_index()
+    # print(dfc.dtypes)
+    # dfc = dfc.groupby('sector').sum()
+    # dfc = dfc.rename(columns = {'Unnamed: 0': 'location'})
+    print(dfc)
+
+    #calculating density manually because some postcode sectors are split into  parts
+    
+    dfm = pd.merge(dfp, dfc, left_on='sector', right_on='sector', how='outer')
+    # dfm = dfm.fillna(0)
+    print(dfm)
+
+    dfm['location_level'] = 'POSTCODE_SECTOR'
+    dfm['location'] = dfm['sector']
+    
+    def drill_up(df: pd.DataFrame, col_name, location_level, 
+            cols_sum = ['population', 'pop_male', 'pop_female', 'area_size'],
+            cols_mean = ['lat', 'lng'], 
+            cols_first = None):
+        dfg = df.groupby(col_name)
+        dfs=dfm=dff=None
+        if cols_sum:
+            dfs = dfg[cols_sum].sum()
+        if cols_mean:
+            dfm = dfg[cols_mean].mean()
+        if cols_first:
+            dff = dfg[cols_first].first()
+        dfo = pd.concat([dfs, dfm, dff], axis=1)
+        dfo = dfo.reset_index()
+        dfo['location_level'] = location_level
+        dfo['location'] = dfo[col_name]
+        # print(dfo)
+        return dfo
+
+    dfmd = drill_up(dfm, 'district', 'POSTCODE_DISTRICT', cols_first=['area', 'country'])
+    dfma = drill_up(dfm, 'area', 'POSTCODE_AREA', cols_first=['country'])
+    dfmc = drill_up(dfm, 'country', 'POSTCODE_COUNTRY', cols_first=None)
+    # print('dfmd')
+    # print(dfmd)
+
+    # # todo function this
+    # dfmd = dfm.groupby('district')[['population', 'pop_male', 'pop_female', 'area_size']].sum().reset_index()
+    # dfmd['location_level'] = 'POSTCODE_DISTRICT'
+    # dfmd['location'] = dfmd['district']
+
+    # dfma = dfm.groupby('area')[['population', 'pop_male', 'pop_female', 'area_size']].sum().reset_index()
+    # dfma['location_level'] = 'POSTCODE_AREA'
+    # dfma['location'] = dfma['area']
+
+    # dfmc = dfm.groupby('country')[['population', 'pop_male', 'pop_female', 'area_size']].sum().reset_index()
+    # dfmc['location_level'] = 'POSTCODE_AREA'
+    # dfmc['location'] = dfmc['area']
+
+    df  = pd.concat([dfm, dfmd, dfma, dfmc])
+    print(df)
+    # df = dfm
+
+    #          'location', 'sector', 'district', 'area', 'region',  'location_level', 'population', 'area_ha',   'id'
+    dfd = dfm[['location', 'sector', 'district', 'area', 'country', 'location_level', 'population', 'area_size']]
+    dfd = dfd.set_index('sector', drop=False).T.to_dict('list')
+    dfd = {k: tuple(v) for k,v in dfd.items()}
+
+
+    import dimension
+    loc_dim : dimension.LocationDimension = dimension.LocationDimension._from_dict(dfd ,headers= df.columns.tolist())
+    print(loc_dim.items()[:10])
+
+    import shared_funcs
+    shared_funcs.dicts['location'] = loc_dim
+
+    pass
+
+def etl_old(fpath):
     """Load census data into database as its own table"""
 
     # process the input file to get a dict of {postcode_sector: total_population}
@@ -126,4 +247,5 @@ def move_to_locations():
 
 # call the etl function if this file is run as a stand-alone program
 if __name__ == '__main__':
-    etl('other_data/KS101SC.csv')
+    # etl('other_data/KS101SC.csv')
+    etl('other_data/open_postcode_geo_scotland.csv', 'other_data/KS101SC.csv')

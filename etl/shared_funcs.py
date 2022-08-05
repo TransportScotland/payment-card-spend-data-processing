@@ -208,13 +208,15 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
             # maybe make fact_line come from a generator instead, to separate creating and saving
             try:
                 fact_line = row_func(row)
+                # except Exception as e:
+                #     error_rows.append((row, e))
+
+                batch.append(fact_line)
             except dimension.DistrictException as de:
                 district_rows.append(row)
                 continue # skip the rest of the execution for this line here
-            # except Exception as e:
-            #     error_rows.append((row, e))
-
-            batch.append(fact_line)
+            except Exception as e:
+                error_rows.append((row, e))
             if len(batch) == maxlen:
 
                 if latest_future:
