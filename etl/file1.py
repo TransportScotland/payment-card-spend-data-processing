@@ -1,3 +1,4 @@
+import MySQLdb
 import shared_funcs
 
 
@@ -21,8 +22,6 @@ def create_dims(row):
     # todo handle this differently
     # loc returns -1 if something else than POSTCODE_SECTOR was in the row.
     # currently raising an exception to skip this row - not the right way to do things.
-    if cardholder_id == -1 or merchant_id == -1:
-        raise
     
     # get measures straight from the row list
     pan_cnt = row[6]
@@ -35,11 +34,18 @@ def create_dims(row):
     cat2_id = shared_funcs.handle_one_dim('category', row, 10)
     cat3_id = shared_funcs.handle_one_dim('category', row, 11)
 
-    
-    # return a tuple of the data to be saved into the fact table.
+
+    # prepare a tuple of the data to be saved into the fact table.
     # currently this must be in this order because that is how it is set up in the database
     # todo consider turning this into a class/struct with the named variables and a function like get_ordered_tuple()
-    return (pan_cnt, txn_cnt, txn_gbp_amt, time_id, cardholder_id, merchant_id, cat1_id, cat2_id, cat3_id)
+    fact_row = (pan_cnt, txn_cnt, txn_gbp_amt, time_id, cardholder_id, merchant_id, cat1_id, cat2_id, cat3_id)
+
+
+    # if cardholder_id == -1 or merchant_id == -1:
+    #     # currently a DistrictException is being raised instead
+    #     pass
+
+    return fact_row
 
 
 def etl(in_path, fact_table_name = 'fact1'):
@@ -58,4 +64,65 @@ def etl(in_path, fact_table_name = 'fact1'):
     shared_funcs.batch_process(in_path, create_dims, fact_table_name)
 
 
+def get_sums_with_matching(con, cardholder, merchant, time):
+    """
+    UNSAFE SQL DO NOT EVER LET USER PUT DATA IN HERE.
+    cardholder, merchant, time at [1] are okay, but at [0] must always be string literals written in code and not read from a file.
+    Once Python 3.11 comes around, look at adding a type hint of typing.StringLiteral
+    """
+    c = con.cursor()
+    c.execute(
+        f"select sum(pan_cnt), sum(txn_cnt), sum(txn_gbp_amt) from \
+            fact1 f \
+                inner join location cl on f.cardholder_id = cl.id \
+                inner join location ml on f.merchant_id   = ml.id \
+                inner join time t on f.time_id = t.id \
+            where cl.{cardholder[0]} = %s \
+            and ml.{merchant[0]} = %s \
+            and t.{time[0]} = %s \
+            ;",
+        ((cardholder[1],), (merchant[1],), (time[1],)) # turn strings into tuples os that string
+    )
+    return c.fetchone()
+
+# TODO handle non-sector data at cardholder level and area/region data at other levels
+# TODO consider fetching rows where sum(measure) is NULL separately from rows whre sum(measure) returns something, 
+# to save (likely) a lot of time from SQL parsing (sending two bigger requests instead of thousands of smaller ones).
+# Or if sector-sector data is rare enough, may even be better to handle those as exceptions than handling districts as exceptions
+# TODO district_rows shouldn't be in-memory, they won't fit
+def district_row_generator_modified(district_rows, con):
+    """
+    Generator for modified rows ready to go into create_dims.
+    Gets the sums of individual measures where district matches, 
+    and subtracts it from the original measure values.
+    Also adds _DEAGG to location_level to make it identifiable
+    and adds an ' X' to a district to make it compatible with sector splitting.
+    """
+    for row in district_rows:
+        row = list(row) 
+        origin_sector = row[3] # todo make these dynamic based on [2],[4]
+        dest_district = row[5]
+        time = row[0]
+
+        tup = get_sums_with_matching(con, ('sector', origin_sector), ('district', dest_district), ('raw',time))
+        tup = tuple(t if t else 0 for t in tup) # changes None values to 0s
+
+        row[4] += '_DEAGG' #for deaggregated. there is very likely a better way to do this
+        row[5] += ' X'
+        row[6] = int(int(row[6]) - tup[0])
+        row[7] = int(int(row[7]) - tup[1])
+        row[8] = float(float(row[8]) - tup[2])
+        yield row
+
+
+def fix_districts():
+    """
+    Goes through rows in shared_funcs.district_rows and saves them to database
+    after running them through district_row_generator_modified
+    """
+    con = shared_funcs.connect_to_db()
+    shared_funcs.batch_process_threaded_from_generator(
+        district_row_generator_modified(
+            shared_funcs.district_rows, con),
+            create_dims, 'fact1', con, if_exists='append')
 

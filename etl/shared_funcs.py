@@ -4,7 +4,6 @@
 
 
 # import python libraries
-import os
 import time
 import MySQLdb
 from collections import deque
@@ -17,10 +16,13 @@ import table_info
 # dimension data structures like {name: dimension_object}
 dicts = {} #TODO rename this
 
+# todo probably better saving these to a file directly. 
+# also adding a max error limit to avoid going through the whole dataset doing nothing
 # for error handling, unused.
 error_rows = []
 # for expectedly skipped rows. currently also unused.
 skipped_rows = []
+district_rows = []
 
 # TODO consider renaming places where dim_dict is to just dimension and similar (this file's  object dicts)
 
@@ -148,67 +150,106 @@ def save_batch_timed(*args):
     return end_time - start_time
 
 
+#TODO comments and better names
+
+def _read_filestream_as_split_lines(file):
+    for line in file:
+        yield split_line(line)
+
+def read_file_as_split_lines(filepath, skip_headers = True):
+    with open(filepath) as file:
+        if skip_headers:
+            _ = next(file)
+        
+        yield from _read_filestream_as_split_lines(file)
+
+def batch_process_threaded_from_file(path, skip_headers=True, **kwargs):
+    batch_process_threaded_from_generator(read_file_as_split_lines(path, skip_headers), **kwargs)
+
+def does_table_exist(table_name, dbcon):
+    c = dbcon.cursor()
+    c.execute("show tables like %s", (table_name,))
+    res = c.fetchone()
+    res = res[0]
+    return True if res == table_name else False
+
+def ensure_table(table_name, dbcon, if_exists):
+    if if_exists == 'replace':
+        return create_db_table(table_name, dbcon)
+    elif if_exists == 'append':
+        if not does_table_exist(table_name, dbcon):
+            # only create if it doesn't exist
+            create_db_table(table_name, dbcon)
+    elif if_exists == 'fail':
+        if does_table_exist(table_name, dbcon):
+            raise ValueError(f'Table {table_name} already exists')
+
 import concurrent.futures
-def batch_process_threaded(path, row_func, fact_table_name, dbcon: None):
+def batch_process_threaded_from_generator(row_generator, row_func, fact_table_name, dbcon, if_exists='fail'):
     start_time = time.time()
-    with open(path) as file:
-        _ = next(file) # discard first row (headers)
-        maxlen = 4000 # 16s. 1000 21s, 10000 17s
-        batch = deque([], maxlen=maxlen)
-        # also consider multiprocessing Queue - one shared queue between threads, and just save as it fills up (or like a queue of batches even)
+    maxlen = 4000 # 16s. 1000 21s, 10000 17s
+    batch = deque([], maxlen=maxlen)
+    # also consider multiprocessing Queue - one shared queue between threads, and just save as it fills up (or like a queue of batches even)
 
-        # connect if dbcon is null
-        connected_here = False
-        if not dbcon:
-            dbcon = connect_to_db()
-            connected_here = True
+    # connect if dbcon is null
+    connected_here = False
+    if not dbcon:
+        dbcon = connect_to_db()
+        connected_here = True
 
-        create_db_table(fact_table_name, dbcon)
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            latest_future = None
-            total_insert_time = 0
+    ensure_table(fact_table_name, dbcon, if_exists)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        latest_future = None
+        total_insert_time = 0
 
-            for line in file:
-                # also option of using csv.reader - slower but handles quotation marks around cells
-                row = split_line(line)
+        for row in row_generator:
+            # also option of using csv.reader - slower but handles quotation marks around cells
 
+            # maybe make fact_line come from a generator instead, to separate creating and saving
+            try:
                 fact_line = row_func(row)
+            except dimension.DistrictException as de:
+                district_rows.append(row)
+                continue # skip the rest of the execution for this line here
+            # except Exception as e:
+            #     error_rows.append((row, e))
 
-                batch.append(fact_line)
-                if len(batch) == maxlen:
+            batch.append(fact_line)
+            if len(batch) == maxlen:
 
-                    if latest_future:
-                        # wait up to 2 seconds for the last SQL INSERT to finish (or raise an Exception)
-                        time_taken = latest_future.result(2)
-                        total_insert_time += time_taken
+                if latest_future:
+                    # wait up to 2 seconds for the last SQL INSERT to finish (or raise an Exception)
+                    time_taken = latest_future.result(2)
+                    total_insert_time += time_taken
 
-                    latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
-                    batch = deque([], maxlen=maxlen) # empty the queue here
-
-            # wait for last save task to finish
-            if latest_future:
-                time_taken = latest_future.result(2)
-                total_insert_time += time_taken
-
-            # save items left in the queue after finished reading the file (e.g. if there are 9500 rows and batches are size 1000, 500 left at the end)
-            if not len(batch) == 0:
                 latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
-                time_taken = latest_future.result(2)
-                total_insert_time += time_taken
+                batch = deque([], maxlen=maxlen) # empty the queue here
 
-            # close connection if connected here
-            if (connected_here):
-                dbcon.close()
+        # wait for last save task to finish
+        if latest_future:
+            time_taken = latest_future.result(2)
+            total_insert_time += time_taken
+
+        # save items left in the queue after finished reading the file (e.g. if there are 9500 rows and batches are size 1000, 500 left at the end)
+        if not len(batch) == 0:
+            latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
+            time_taken = latest_future.result(2)
+            total_insert_time += time_taken
+
+        # close connection if connected here
+        if (connected_here):
+            dbcon.close()
     end_time = time.time()
-    print(f'read handle and write took {end_time - start_time} seconds on file {os.path.basename(path)}.')
+    print(f'read handle and write took {end_time - start_time} seconds to table {fact_table_name}.')
     print(f'Inserting into fact table took a total of {total_insert_time} seconds')
-    pass
+    pass  
 
 
 # TODO rename this
+# TODO refactor needed, there is a lot of deeply nested function calls where each don't really add anything 
 def batch_process(path, row_func, fact_table_name, dbcon=None):
     """Process file at path. See batch_process_threaded"""
-    batch_process_threaded(path, row_func, fact_table_name, dbcon)
+    batch_process_threaded_from_file(path=path, skip_headers=True, row_func=row_func, fact_table_name=fact_table_name, dbcon=dbcon, if_exists='replace')
     pass
 
 
@@ -231,7 +272,7 @@ def save_dims():
     dbcon.close()
 
 # TODO make this adjustable
-def connect_to_db():
+def connect_to_db() -> MySQLdb.Connection:
     """Get MySQLdb connection to default database."""
     db = MySQLdb.connect(user='temp_user', passwd = 'password', database='sgov')
     # c = db.cursor()

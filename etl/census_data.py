@@ -82,20 +82,26 @@ def save_to_sql(population_dict):
     Returns:
         A pandas DataFrame similar to the one saved to the database, for easier printing.
     """
+    import table_info
+    table_headers= table_info.headers_dict['census'] # location, population, id
+
+    import dimension
+    dim = dimension.SimpleDimension.from_dict_after_make_tuples(population_dict, table_headers[:2])
+    shared_funcs.dicts['census'] = dim
+    shared_funcs.save_dim('census')
+
+
+    # returning a df for backward comp
 
     # pandas is slow but the census data currently isn't big enough to matter
     import pandas as pd
-    import table_info
-
-    table_headers= table_info.headers_dict['census'] # location, population, id
 
     # convert dict to df with rows like (id, location, population), taking the column names from table_info headers
     df = pd.DataFrame(data=zip(population_dict.keys(), population_dict.values()), columns=table_headers[:2])
 
     # save to sql, renaming the index to the index column specified in table_info headers
-    df.to_sql('census', shared_funcs.get_sqlalchemy_con(), index_label=table_headers[-1], if_exists='replace')
+    # df.to_sql('census', shared_funcs.get_sqlalchemy_con(), index_label=table_headers[-1], if_exists='replace')
     return df
-
 
 def etl(fpath):
     """Load census data into database as its own table"""
@@ -108,7 +114,7 @@ def etl(fpath):
 
     # save to the SQL database
     pop_df = save_to_sql(population_dict)
-    print(pop_df)
+    # print(pop_df)
 
 # consider doing this before putting all the locations into sql - or just have the census dict be the main location table
 def move_to_locations():

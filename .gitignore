@@ -6,4 +6,5 @@ wh2/
 out/
 wh/
 experimental/
+/temp*
 */__pycache__/*
