@@ -64,7 +64,7 @@ class Dimension(metaclass=abc.ABCMeta):
         Creates a dimension from a dict like
         {key: (row_item1, row_item2, ...)}
         """
-        new = Dimension()
+        new = cls()
         new.headers = headers
         for key, row in dic.items():
             id = new.add_if_not_in(key, row)
@@ -73,6 +73,9 @@ class Dimension(metaclass=abc.ABCMeta):
         # items = dic.items()
         # new.dim_list = [v for k, v in items]
         # new.indices_dict = {k: i for i, (k, v) in enumerate(items)}
+
+    def get_index(self, key):
+        return self.indices_dict[key]
 
     # override functions to make this class's interface work a lot like a dictionary
     def __contains__(self, key):
@@ -126,6 +129,10 @@ class SimpleDimension(Dimension):
 class DistrictException(Exception):
     pass
 
+class UnknownLocationError(Exception):
+    #todo maybe have location as a contructor parameter but then this is python so it might be messy
+    pass
+
 class LocationDimension(Dimension):
     """
     A dimension for postcode sector locations
@@ -133,7 +140,10 @@ class LocationDimension(Dimension):
 
     def __init__(self) -> None:
         super().__init__()
-        self.headers = ('sector', 'district', 'area', 'region')
+        import table_info
+        #     'location': ('location', 'sector', 'district', 'area', 'region', 'location_level', 'population', 'area_ha', # 'id'),
+        self.headers = table_info.headers_dict['location'][:-1]
+    
     @staticmethod
     def postcode_sector_to_loc_list(sector: str):
         """
@@ -154,21 +164,29 @@ class LocationDimension(Dimension):
         return (sector, district, area, region)
 
     # TODO handle partially aggregated data
-    def add_row(self, row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCODE_SECTOR'):
+    def add_row(self, row, loc_level_idx = 4, loc_level = 5, smallest_area_name = 'POSTCODE_SECTOR', skip_bigger_area_rows = False):
         """
         Add an element from row at loc_idx to this dimension's table, if the value at loc_level_idx is smallest_area_name.
         Splits up postcode sectors to district and area parts too
         """
-        if row[loc_level_idx] != smallest_area_name and row[loc_level_idx][-6:] != '_DEAGG':
-            # row is not of POSTCODE_SECTOR. TODO deal with this in a better way
-            raise DistrictException(f'Row at index {loc_level_idx} expected {smallest_area_name}, but got {row[loc_level_idx]}')
-            return -1
+        loc = row[loc_level]
+        loc_level = row[loc_level_idx]
+        if (skip_bigger_area_rows):
+            if loc_level != smallest_area_name: 
+                # else:
+                    # row is not of POSTCODE_SECTOR. maybe deal with this in a better way
+                    # maybe instead just return a -1 because it will happen quite often and exceptions are slow
+                raise DistrictException(f'Row at index {loc_level_idx} expected {smallest_area_name}, but got {row[loc_level_idx]}')
 
-        sector = row[loc_idx]
-        loc_list = self.postcode_sector_to_loc_list(sector)
-
-        id = self.add_if_not_in(sector, loc_list)
+        maxid = len(self.dim_list)
+        id = self.add_if_not_in(loc, (loc, None, None, None, None, loc_level, None, None, None))
+        if id >= maxid:
+            # newly added
+            print('Unrecognised location: ' + loc) # TODO save this to a file instead
+            pass
+        # return self.get_index(row[loc_level])
         return id
+
 
 class TimeDimension(Dimension):
     """A dimension table for the time dimension"""

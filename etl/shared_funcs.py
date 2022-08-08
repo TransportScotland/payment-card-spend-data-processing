@@ -185,7 +185,7 @@ def ensure_table(table_name, dbcon, if_exists):
             raise ValueError(f'Table {table_name} already exists')
 
 import concurrent.futures
-def batch_process_threaded_from_generator(row_generator, row_func, fact_table_name, dbcon, if_exists='fail'):
+def batch_process_threaded_from_generator(row_generator, row_func, fact_table_name, dbcon, if_exists='fail', **row_func_kwargs):
     start_time = time.time()
     maxlen = 4000 # 16s. 1000 21s, 10000 17s
     batch = deque([], maxlen=maxlen)
@@ -207,14 +207,16 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
 
             # maybe make fact_line come from a generator instead, to separate creating and saving
             try:
-                fact_line = row_func(row)
+                fact_line = row_func(row, **row_func_kwargs)
+                # except Exception as e:
+                #     error_rows.append((row, e))
+
+                batch.append(fact_line)
             except dimension.DistrictException as de:
                 district_rows.append(row)
                 continue # skip the rest of the execution for this line here
-            # except Exception as e:
-            #     error_rows.append((row, e))
-
-            batch.append(fact_line)
+            except Exception as e:
+                error_rows.append((row, e))
             if len(batch) == maxlen:
 
                 if latest_future:
@@ -231,7 +233,7 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
             total_insert_time += time_taken
 
         # save items left in the queue after finished reading the file (e.g. if there are 9500 rows and batches are size 1000, 500 left at the end)
-        if not len(batch) == 0:
+        if len(batch) != 0:
             latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
             time_taken = latest_future.result(2)
             total_insert_time += time_taken
@@ -247,9 +249,9 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
 
 # TODO rename this
 # TODO refactor needed, there is a lot of deeply nested function calls where each don't really add anything 
-def batch_process(path, row_func, fact_table_name, dbcon=None):
+def batch_process(path, row_func, fact_table_name, dbcon=None, **kwargs):
     """Process file at path. See batch_process_threaded"""
-    batch_process_threaded_from_file(path=path, skip_headers=True, row_func=row_func, fact_table_name=fact_table_name, dbcon=dbcon, if_exists='replace')
+    batch_process_threaded_from_file(path=path, skip_headers=True, row_func=row_func, fact_table_name=fact_table_name, dbcon=dbcon, if_exists='replace', **kwargs)
     pass
 
 
@@ -262,6 +264,7 @@ def save_dim(name, dbcon = None):
 
     dicts[name].to_sql(name, dbcon)
     if db_connected_here:
+        dbcon.commit()
         dbcon.close()
 
 def save_dims():
@@ -269,6 +272,7 @@ def save_dims():
     dbcon = connect_to_db()
     for name in dicts.keys():
         save_dim(name, dbcon)
+    dbcon.commit()
     dbcon.close()
 
 # TODO make this adjustable
@@ -285,6 +289,7 @@ def get_sqlalchemy_con():
 
 
 # A lot of wrapper functions which are mostly here for historic purposes. But may be good to keep anyway in case changes are wanted.
+#TODO change explicit args to *args or **kwargs
 
 def add_to_dict_if_not_in(dict_name, key, values: list):
     """Wrapper function for dimension.add_if_not_in. Takes in name of dim as stored in dicts here"""
@@ -299,9 +304,9 @@ def handle_time(row, index = 0):
     """Wrapper for TimeDimension.add_row. Takes in name of dim as stored in dicts here"""
     return dicts['time'].add_row(row, index)
 
-def handle_loc(row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCODE_SECTOR'):
+def handle_loc(row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCODE_SECTOR', skip_bigger_area_rows=False):
     """Wrapper for LocationDimension.add_row. Takes in name of dim as stored in dicts here"""
-    return dicts['location'].add_row(row, loc_level_idx, loc_idx, smallest_area_name)
+    return dicts['location'].add_row(row, loc_level_idx, loc_idx, smallest_area_name, skip_bigger_area_rows=skip_bigger_area_rows)
 
 # consider removing
 def postcode_sector_to_loc_list(sector: str):

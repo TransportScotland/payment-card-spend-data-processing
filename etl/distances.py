@@ -58,10 +58,10 @@ def etl(distances_matrix_files):
 
     df['seconds'] = df['seconds'].map(tryfloat)
     # print any nulls to show they will be in the database like that
-    print(df.loc[df['seconds'].isna()])
+    # print(df.loc[df['seconds'].isna()])
     time2 = time.time()
 
-    print(df)
+    # print(df)
     
     # save to database
     sqlcon = sqlalchemy.create_engine('mysql://', creator=shared_funcs.connect_to_db)
@@ -78,7 +78,7 @@ def etl(distances_matrix_files):
 
 
     time3 = time.time()
-    print(f'{time2-time1} seconds to load and manipulate, {time3-time2} seconds to load into SQL database.')
+    print(f'{time2-time1} seconds to load and manipulate distances, {time3-time2} seconds to load into SQL database.')
 
 if __name__ == '__main__':
     # todo have a default filename or an error message
