@@ -3,7 +3,7 @@ import shared_funcs
 
 
 # fact1_headers = ('pan_cnt', 'txn_cnt', 'txn_gbp_amt', 'time_id', 'cardholder_id', 'merchant_id', 'cat1_id', 'cat2_id', 'cat3_id')
-def create_dims(row):
+def create_dims(row, skip_bigger_area_rows = True):
     """
     Turn a row tuple from the File 1 csv into a fact table entry, 
     filling up intermediate dimension tables along the way.
@@ -16,8 +16,8 @@ def create_dims(row):
     """
     # add dimension data to dimension data structures if not already in, and get the relevant ID
     time_id = shared_funcs.handle_time(row)
-    cardholder_id = shared_funcs.handle_loc(row, 2, 3)
-    merchant_id = shared_funcs.handle_loc(row, 4, 5)
+    cardholder_id = shared_funcs.handle_loc(row, 2, 3, skip_bigger_area_rows=skip_bigger_area_rows)
+    merchant_id = shared_funcs.handle_loc(row, 4, 5, skip_bigger_area_rows=skip_bigger_area_rows)
 
     # todo handle this differently
     # loc returns -1 if something else than POSTCODE_SECTOR was in the row.
@@ -61,7 +61,7 @@ def etl(in_path, fact_table_name = 'fact1'):
     shared_funcs.ensure_dim_dicts('time', 'location', 'category')
 
     # process the file, calling create_dims() on each row
-    shared_funcs.batch_process(in_path, create_dims, fact_table_name)
+    shared_funcs.batch_process(in_path, create_dims, fact_table_name, skip_bigger_area_rows = False)
 
 
 def get_sums_with_matching(con, cardholder, merchant, time):
@@ -107,8 +107,6 @@ def district_row_generator_modified(district_rows, con):
         tup = get_sums_with_matching(con, ('sector', origin_sector), ('district', dest_district), ('raw',time))
         tup = tuple(t if t else 0 for t in tup) # changes None values to 0s
 
-        row[4] += '_DEAGG' #for deaggregated. there is very likely a better way to do this
-        row[5] += ' X'
         row[6] = int(int(row[6]) - tup[0])
         row[7] = int(int(row[7]) - tup[1])
         row[8] = float(float(row[8]) - tup[2])
@@ -120,9 +118,10 @@ def fix_districts():
     Goes through rows in shared_funcs.district_rows and saves them to database
     after running them through district_row_generator_modified
     """
-    con = shared_funcs.connect_to_db()
-    shared_funcs.batch_process_threaded_from_generator(
-        district_row_generator_modified(
-            shared_funcs.district_rows, con),
-            create_dims, 'fact1', con, if_exists='append')
+    if shared_funcs.district_rows:
+        con = shared_funcs.connect_to_db()
+        shared_funcs.batch_process_threaded_from_generator(
+            district_row_generator_modified(
+                shared_funcs.district_rows, con),
+                create_dims, 'fact1', con, if_exists='append', skip_bigger_area_rows = False)
 

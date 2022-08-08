@@ -164,29 +164,29 @@ class LocationDimension(Dimension):
         return (sector, district, area, region)
 
     # TODO handle partially aggregated data
-    def add_row(self, row, loc_level_idx = 4, loc_idx = 5, smallest_area_name = 'POSTCODE_SECTOR'):
+    def add_row(self, row, loc_level_idx = 4, loc_level = 5, smallest_area_name = 'POSTCODE_SECTOR', skip_bigger_area_rows = False):
         """
         Add an element from row at loc_idx to this dimension's table, if the value at loc_level_idx is smallest_area_name.
         Splits up postcode sectors to district and area parts too
         """
-        loc = row[loc_idx]
-        if row[loc_idx] not in self.indices_dict:
-            raise UnknownLocationError('Unrecognised location: ' + loc)
-        return self.get_index(row[loc_idx])
-        
-        if row[loc_level_idx] != smallest_area_name and row[loc_level_idx][-6:] != '_DEAGG':
-            # row is not of POSTCODE_SECTOR. TODO deal with this in a better way
-            raise DistrictException(f'Row at index {loc_level_idx} expected {smallest_area_name}, but got {row[loc_level_idx]}')
-            return -1
+        loc = row[loc_level]
+        loc_level = row[loc_level_idx]
+        if (skip_bigger_area_rows):
+            if loc_level != smallest_area_name: 
+                # else:
+                    # row is not of POSTCODE_SECTOR. maybe deal with this in a better way
+                    # maybe instead just return a -1 because it will happen quite often and exceptions are slow
+                raise DistrictException(f'Row at index {loc_level_idx} expected {smallest_area_name}, but got {row[loc_level_idx]}')
 
-
-
-        location = row[loc_idx]
-        # loc_list = self.postcode_sector_to_loc_list(sector)
-
-        # id = self.add_if_not_in(sector, loc_list)
-        id = self[location]
+        maxid = len(self.dim_list)
+        id = self.add_if_not_in(loc, (loc, None, None, None, None, loc_level, None, None, None))
+        if id >= maxid:
+            # newly added
+            print('Unrecognised location: ' + loc) # TODO save this to a file instead
+            pass
+        # return self.get_index(row[loc_level])
         return id
+
 
 class TimeDimension(Dimension):
     """A dimension table for the time dimension"""

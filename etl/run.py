@@ -24,19 +24,23 @@ file2.etl('data/file2.csv')
 file3.etl('data/file3.csv')
 file4.etl('data/file4.csv')
 
+# save the dimensions into the database. This needs to be called, otherwise the database will have only the fact tables
+shared_funcs.save_dims() # TODO only save after districts fixed, and make that fn use in-mem table
+
+print(f'skipped {len(shared_funcs.district_rows)} rows to be de-aggregated later')
 # subtract sums of sector values from district values
 file1.fix_districts()
+
+shared_funcs.save_dim('location') 
+
 
 # combine with other datasets
 # TODO add --reload-distances flag (or other datasets) to not load in distances every time (default False, maybe also do a check if exists in db)
 # census_data.etl_old('other_data/KS101SC.csv')
-distances.etl(['generated_data/durations_matrix.csv']) # needs to be run after census
-# distances.etl(['generated_data/durations_matrix_20rows.csv']) # small subset for testing purposes
+# distances.etl(['generated_data/durations_matrix.csv']) # needs to be run after census
+distances.etl(['generated_data/durations_matrix_20rows.csv']) # small subset for testing purposes
 
-# save the dimensions into the database. This needs to be called, otherwise the database will have only the fact tables
-shared_funcs.save_dims()
 
-census_data.move_to_locations()
 
 # stop timer and print total time taken
 time1 = time.time()

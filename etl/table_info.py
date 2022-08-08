@@ -18,7 +18,7 @@ headers_dict = {
     'fact4': ('perc_jour', 'perc_pan', 
         'time_id', 'merchant_id', 'transport_mode_id'),
     'time': ('raw', 'year', 'quarter', 'month', 'id'),
-    'location': ('location', 'sector', 'district', 'area', 'region', 'location_level', 'population', 'area', 'id'),
+    'location': ('location', 'sector', 'district', 'area', 'region', 'location_level', 'population', 'area_size', 'density', 'id'),
     'category': ('category', 'id'),
     'm_channel': ('m_channel', 'id'),
     'purpose': ('purpose', 'id'),
@@ -96,14 +96,15 @@ create_strings['time'] = (
 #     'location': ('location', 'sector', 'district', 'area', 'region', 'location_level', 'population', 'area_ha', 'id'),
 create_strings['location'] = ( 
     "CREATE TABLE location ("
-    "location VARCHAR(63),"
+    "location VARCHAR(63) NOT NULL,"
     "sector VARCHAR(6),"
     "district VARCHAR(4),"
     "area VARCHAR(2),"
     "region VARCHAR(63),"
-    "location_level VARCHAR(31),"
+    "location_level VARCHAR(31) NOT NULL,"
     "population INT,"
     "area_size INT,"
+    "density FLOAT,"
     "id INT NOT NULL,"
     "PRIMARY KEY (id)"
     ")")
