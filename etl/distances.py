@@ -20,11 +20,13 @@ def etl(distances_matrix_files):
     # load in census data to match location IDs
     # TODO consider loading location table instead (a subset of census table)
     locs = pd.read_sql(
-        sql='select location, id from census;', 
-        con=sqlalchemy.create_engine(
-            'mysql://temp_user:password@localhost/sgov', 
-            )
+        sql='select location, id from location;', 
+        con=shared_funcs.get_sqlalchemy_con()
         )
+        # con=sqlalchemy.create_engine(
+        #     'mysql://temp_user:password@localhost/sgov', 
+        #     )
+        # )
 
     # turn the locations df into a dictionary {location -> location_id_from_census_table}
     loc_to_id : dict = locs.set_index('location').to_dict() # gets dict like {'id': {'AB10 1':1, 'DD1 4': 2, ...}}
@@ -64,7 +66,8 @@ def etl(distances_matrix_files):
     # print(df)
     
     # save to database
-    sqlcon = sqlalchemy.create_engine('mysql://', creator=shared_funcs.connect_to_db)
+    # sqlcon = sqlalchemy.create_engine('mysql://', creator=shared_funcs.connect_to_db)
+    sqlcon = shared_funcs.get_sqlalchemy_con()
     df.to_sql(
         'durations', 
         con=sqlcon, 

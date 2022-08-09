@@ -79,7 +79,7 @@ def ensure_dim_dicts(*dimension_names):
 
 def split_line(line):
     """Remove trailing whitespace and split on every comma"""
-    return line.rstrip().split(',')
+    return line.rstrip().split('|')
 
 
 def create_db_table(table_name, dbcon, drop_if_exists = True):
@@ -184,10 +184,16 @@ def ensure_table(table_name, dbcon, if_exists):
         if does_table_exist(table_name, dbcon):
             raise ValueError(f'Table {table_name} already exists')
 
+def save_errors(error_rows):
+    with open('error_file.txt', 'a') as file:
+        # file.write('\n')
+        file.write(str([f'{time.time()}: {str(e)}\n' for e in error_rows]))
+
 import concurrent.futures
 def batch_process_threaded_from_generator(row_generator, row_func, fact_table_name, dbcon, if_exists='fail', **row_func_kwargs):
     start_time = time.time()
     maxlen = 4000 # 16s. 1000 21s, 10000 17s
+    error_rows= []
     batch = deque([], maxlen=maxlen)
     # also consider multiprocessing Queue - one shared queue between threads, and just save as it fills up (or like a queue of batches even)
 
@@ -216,27 +222,44 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
                 district_rows.append(row)
                 continue # skip the rest of the execution for this line here
             except Exception as e:
-                error_rows.append((row, e))
+                error_rows.append((e, row))
+
             if len(batch) == maxlen:
+                
+                try:
+                    if latest_future:
+                        # wait up to 2 seconds for the last SQL INSERT to finish (or raise an Exception)
+                        time_taken = latest_future.result(3)
+                        total_insert_time += time_taken
 
-                if latest_future:
-                    # wait up to 2 seconds for the last SQL INSERT to finish (or raise an Exception)
-                    time_taken = latest_future.result(2)
-                    total_insert_time += time_taken
+                    latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
+                    batch = deque([], maxlen=maxlen) # empty the queue here
+                except MySQLdb.DataError as mde:
+                    error_rows.append((mde, batch))
+                # except TimeoutError
+                except Exception as e:
+                    error_rows.append((e, batch))
+            
+            if error_rows and len(error_rows) >=1000:
+                save_errors(error_rows)
+                error_rows = []
+        try:
+                
+            # wait for last save task to finish
+            if latest_future:
+                time_taken = latest_future.result(2)
+                total_insert_time += time_taken
 
+            # save items left in the queue after finished reading the file (e.g. if there are 9500 rows and batches are size 1000, 500 left at the end)
+            if len(batch) != 0:
                 latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
-                batch = deque([], maxlen=maxlen) # empty the queue here
+                time_taken = latest_future.result(2)
+                total_insert_time += time_taken
+        except Exception as e:
+            error_rows.append(e, batch)
 
-        # wait for last save task to finish
-        if latest_future:
-            time_taken = latest_future.result(2)
-            total_insert_time += time_taken
-
-        # save items left in the queue after finished reading the file (e.g. if there are 9500 rows and batches are size 1000, 500 left at the end)
-        if len(batch) != 0:
-            latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
-            time_taken = latest_future.result(2)
-            total_insert_time += time_taken
+        if error_rows:
+            save_errors(error_rows)
 
         # close connection if connected here
         if (connected_here):

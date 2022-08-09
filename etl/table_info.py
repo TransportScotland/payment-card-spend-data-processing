@@ -31,9 +31,9 @@ create_strings = {}
 
 create_strings['fact1'] = ( 
     "CREATE TABLE fact1 ("
-    "id INT NOT NULL AUTO_INCREMENT,"
-    "pan_cnt INT NOT NULL,"
-    "txn_cnt INT NOT NULL,"
+    "id INT UNSIGNED NOT NULL AUTO_INCREMENT,"
+    "pan_cnt BIGINT UNSIGNED NOT NULL,"
+    "txn_cnt BIGINT UNSIGNED NOT NULL,"
     "txn_gbp_amt FLOAT NOT NULL,"
     "time_id INT NOT NULL,"
     "cardholder_id INT NOT NULL,"
@@ -46,11 +46,11 @@ create_strings['fact1'] = (
 
 create_strings['fact2'] = ( 
     "CREATE TABLE fact2 ("
-    "id INT NOT NULL AUTO_INCREMENT,"
-    "pan_cnt INT NOT NULL,"
-    "txn_cnt INT NOT NULL,"
+    "id INT UNSIGNED NOT NULL AUTO_INCREMENT,"
+    "pan_cnt BIGINT UNSIGNED NOT NULL,"
+    "txn_cnt BIGINT UNSIGNED NOT NULL,"
     "txn_gbp_amt FLOAT NOT NULL,"
-    "merchant_outlet_count INT NOT NULL,"
+    "merchant_outlet_count INT UNSIGNED NOT NULL,"
     "percent_repeat FLOAT NOT NULL,"
     "time_id INT NOT NULL,"
     "cardholder_id INT NOT NULL,"
@@ -61,10 +61,10 @@ create_strings['fact2'] = (
 
 create_strings['fact3'] = ( 
     "CREATE TABLE fact3 ("
-    "id INT NOT NULL AUTO_INCREMENT,"
+    "id INT UNSIGNED NOT NULL AUTO_INCREMENT,"
     "perc_rail FLOAT NOT NULL,"
-    "pan_cnt INT NOT NULL,"
-    "txn_cnt INT NOT NULL,"
+    "pan_cnt BIGINT UNSIGNED NOT NULL,"
+    "txn_cnt BIGINT UNSIGNED NOT NULL,"
     "txn_gbp_amt FLOAT NOT NULL,"
     "time_id INT NOT NULL,"
     "merchant_id INT NOT NULL,"
@@ -74,9 +74,9 @@ create_strings['fact3'] = (
 
 create_strings['fact4'] = ( 
     "CREATE TABLE fact4 ("
-    "id INT NOT NULL AUTO_INCREMENT,"
+    "id INT UNSIGNED NOT NULL AUTO_INCREMENT,"
     "perc_jour FLOAT NOT NULL,"
-    "perc_pan INT NOT NULL,"
+    "perc_pan FLOAT NOT NULL,"
     "time_id INT NOT NULL,"
     "merchant_id INT NOT NULL,"
     "transport_mode_id INT NOT NULL,"
@@ -88,7 +88,7 @@ create_strings['time'] = (
     "raw VARCHAR(31) NOT NULL,"
     "year INT NOT NULL,"
     "quarter INT NOT NULL,"
-    "month INT NOT NULL," # could also month_name varchar
+    "month INT," # could also month_name varchar
     "id INT NOT NULL,"
     "PRIMARY KEY (id)"
     ")")
