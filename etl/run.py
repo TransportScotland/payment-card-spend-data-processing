@@ -18,11 +18,15 @@ census_data.etl('other_data/open_postcode_geo_scotland.csv','other_data/KS101SC.
 
 # call each of the files' relevant ETL function to read the file, transform it, and load into the database
 # first deal with the main data sets of card data
-file1.etl('data/file1_pa_1e4.csv') # smaller file for testing purposes
-# file1.etl('data/file1.csv')
-file2.etl('data/file2.csv')
-file3.etl('data/file3.csv')
-file4.etl('data/file4.csv')
+
+# f1p = 'temp_head100.csv'
+# f2p = 'temp2_head100.csv'
+f1p = 'C:/SFTP/san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2021.csv'
+f2p = 'C:/SFTP/san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_2_2021.csv'
+file1.etl(f1p) # smaller file for testing purposes
+file2.etl(f2p)
+# file3.etl('data/file3.csv')
+# file4.etl('data/file4.csv')
 
 # save the dimensions into the database. This needs to be called, otherwise the database will have only the fact tables
 shared_funcs.save_dims() # TODO only save after districts fixed, and make that fn use in-mem table
@@ -37,8 +41,8 @@ shared_funcs.save_dim('location')
 # combine with other datasets
 # TODO add --reload-distances flag (or other datasets) to not load in distances every time (default False, maybe also do a check if exists in db)
 # census_data.etl_old('other_data/KS101SC.csv')
-# distances.etl(['generated_data/durations_matrix.csv']) # needs to be run after census
-distances.etl(['generated_data/durations_matrix_20rows.csv']) # small subset for testing purposes
+distances.etl(['generated_data/durations_matrix.csv']) # needs to be run after census
+# distances.etl(['generated_data/durations_matrix_20rows.csv']) # small subset for testing purposes
 
 
 

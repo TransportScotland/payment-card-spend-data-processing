@@ -20,7 +20,7 @@ The main functions to look at when trying to understand this code are fileX.etl(
 (this is the most importand note here)
 
     create user 'temp_user'@'localhost' identified by 'password';
-    create databse sgov;
+    create database sgov;
     grant create, drop, select, insert, execute, alter, index, update, delete on sgov.* to 'temp_user'@'localhost';
 
 Power BI is a bit annoying with same tables with different links, need to duplicate tables (click New Table; newT = 'originalT')

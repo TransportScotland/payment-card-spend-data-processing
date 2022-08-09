@@ -5,7 +5,7 @@ wh/
 wh2/
 out/
 wh/
-experimental/
 /temp*
 */__pycache__/*
 personal_notes.md
+error_file.*

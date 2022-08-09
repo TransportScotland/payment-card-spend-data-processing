@@ -182,7 +182,7 @@ class LocationDimension(Dimension):
         id = self.add_if_not_in(loc, (loc, None, None, None, None, loc_level, None, None, None))
         if id >= maxid:
             # newly added
-            print('Unrecognised location: ' + loc) # TODO save this to a file instead
+            # print('Unrecognised location: ' + loc) # TODO save this to a file instead
             pass
         # return self.get_index(row[loc_level])
         return id
@@ -202,12 +202,17 @@ class TimeDimension(Dimension):
         Add time at col_index to dimension table along with categorised by year, quarter, month
         """
         time_raw = str(row[col_index]) #optional depending on stuff
-        if (not time_raw[0].isnumeric()):
-            # a quarter - skipping for now
-            raise
-        year = int(time_raw[:4]) #check if faster this or 202201 / 100 and 202201 % 100
-        month = int(time_raw[4:6])
-        quarter = int((month - 1) / 3) + 1
+        if (time_raw[0].isnumeric()):
+            # month data
+            year = int(time_raw[:4]) #check if faster this or 202201 / 100 and 202201 % 100
+            month = int(time_raw[4:6])
+            quarter = int((month - 1) / 3) + 1
+        else:
+            # a quarter
+            year = int('20' + time_raw[-2:])
+            m1 = time_raw[:3]
+            quarter = {'Jan': 1, 'Apr': 2, 'Jul': 3, 'Oct': 4}[m1]
+            month = None
 
         # not sure if I actually need time_raw in the table but maybe there was a reason for it
         time_id = self.add_if_not_in(time_raw, (time_raw, year, quarter, month))
