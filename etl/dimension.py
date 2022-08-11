@@ -141,7 +141,8 @@ class LocationDimension(Dimension):
     def __init__(self) -> None:
         super().__init__()
         import table_info
-        #     'location': ('location', 'sector', 'district', 'area', 'region', 'location_level', 'population', 'area_ha', # 'id'),
+        #     'location': ('location', 'sector', 'district', 'area', 'region', 'location_level', 
+        #         'latitude', 'longitude, 'population', 'area_ha', # 'id'),
         self.headers = table_info.headers_dict['location'][:-1]
     
     @staticmethod
@@ -178,12 +179,23 @@ class LocationDimension(Dimension):
                     # maybe instead just return a -1 because it will happen quite often and exceptions are slow
                 raise DistrictException(f'Row at index {loc_level_idx} expected {smallest_area_name}, but got {row[loc_level_idx]}')
 
-        maxid = len(self.dim_list)
-        id = self.add_if_not_in(loc, (loc, None, None, None, None, loc_level, None, None, None))
-        if id >= maxid:
-            # newly added
-            # print('Unrecognised location: ' + loc) # TODO save this to a file instead
-            pass
+        if loc not in self.indices_dict:
+            # unrecognised
+            # temporarily splitting up only sectors
+            if loc_level == smallest_area_name:
+                sector, area, district, region = self.postcode_sector_to_loc_list(loc)
+            else:
+                sector, area, district, region = None, None, None, None
+            id = self.add_if_not_in(loc,(loc, sector, area, district, region, loc_level, None, None, None, None, None))
+        else:
+            # print('recognised: '+ loc)
+            id = self.indices_dict[loc]
+        # maxid = len(self.dim_list)
+        # id = self.add_if_not_in(loc, (loc, None, None, None, None, loc_level, None, None, None))
+        # if id >= maxid:
+        #     # newly added
+        #     # print('Unrecognised location: ' + loc) # TODO save this to a file instead
+        #     pass
         # return self.get_index(row[loc_level])
         return id
 

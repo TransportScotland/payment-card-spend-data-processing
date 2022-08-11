@@ -74,7 +74,8 @@ def get_density(df):
 
 def to_dimension(df):
     #         'location', 'sector', 'district', 'area', 'region',  'location_level', 'population', 'area_ha',   'id'
-    dfd = df[['location', 'sector', 'district', 'area', 'country', 'location_level', 'population', 'area_size', 'density']]
+    dfd = df[['location', 'sector', 'district', 'area', 'country', 'location_level', 
+        'lat', 'lng','population', 'area_size', 'density']]
     dfd = dfd.set_index('location', drop=False).T
     import numpy as np
     dfd = dfd.replace(to_replace=np.nan, value=None) # replace pandas NaNs with NoneType Nones, so they can be NULL in the db

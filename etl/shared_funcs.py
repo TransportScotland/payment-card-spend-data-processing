@@ -221,6 +221,8 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
             except dimension.DistrictException as de:
                 district_rows.append(row)
                 continue # skip the rest of the execution for this line here
+            except KeyboardInterrupt as ke:
+                raise ke
             except Exception as e:
                 error_rows.append((e, row))
 
@@ -237,6 +239,8 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
                 except MySQLdb.DataError as mde:
                     error_rows.append((mde, batch))
                 # except TimeoutError
+                except KeyboardInterrupt as ke:
+                    raise ke
                 except Exception as e:
                     error_rows.append((e, batch))
             
@@ -302,6 +306,8 @@ def save_dims():
 def connect_to_db() -> MySQLdb.Connection:
     """Get MySQLdb connection to default database."""
     db = MySQLdb.connect(user='temp_user', passwd = 'password', database='sgov')
+    # import psycopg2
+    # db = psycopg2.connect(database='sgov_mini', user='temp_user', password='password')
     # c = db.cursor()
     return db
 
