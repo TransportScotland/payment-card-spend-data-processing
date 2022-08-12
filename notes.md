@@ -45,3 +45,7 @@ Time inserting (with transformations) of 1 million rows:
 * my row-wise solution (etl/file1.py): 18 seconds
 
 * 4 batches of 1k ended up slower than 1 batch of 4k for each thread
+
+
+# maps
+For adding maps to metabase, see https://www.metabase.com/docs/latest/administration-guide/20-custom-maps.html. Also consider UK postcode district shape maps https://github.com/missinglink/uk-postcode-polygons. Sector maps are not readily available but can be created with open source code.
