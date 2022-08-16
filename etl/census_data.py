@@ -34,7 +34,7 @@ def prepare_scotland_census_df(census_fpath):
     #will calculate density manually because some postcode sectors are split into  parts
 
     dfc = dfc.convert_dtypes() # make it stop converting ints to object by converting 'int' to 'Int64' (idk why pandas is this way)
-    dfc['sector'] = dfc['sector'].str.extract(r'(\b\w\w?\d[\d\w]? \d)') # 1 or 2 letters, a digit, a digit or a letter, a space, and a digit
+    dfc['sector'] = dfc['sector'].str.extract(r'(\b\w\w?\d[\d\w]? \d)') # start of word, 1 or 2 letters, a digit, a digit or a letter, a space, and a digit
     dfc = dfc.groupby('sector')[['population', 'pop_male', 'pop_female', 'area_size']].sum()
     dfc = dfc.reset_index()
     return dfc
@@ -48,8 +48,13 @@ def prepare_eng_wal_census_df(census_fpaths):
     dfc = dfc.convert_dtypes()
     # print(dfc)
     dfc['sector'] = dfc['postcode'].str[:-2]
+    # change AB102 to AB10 2
     dfc = dfc.groupby('sector')[['population', 'pop_male', 'pop_female']].sum()
     dfc = dfc.reset_index()
+    # add missing spaces
+    dfc.loc[dfc['sector'].str[3] != ' ', 'sector'] = dfc['sector'].str[:4] + ' ' + dfc['sector'].str[3:]
+    # replace multiple spaces with one space
+    dfc['sector'] = dfc['sector'].str.replace('  ', ' ', regex=False) 
     return dfc
 
 
