@@ -14,7 +14,7 @@ time0 = time.time()
 
 # todo set up the database connection here
 
-census_data.etl('other_data/open_postcode_geo_scotland.csv','other_data/KS101SC.csv')
+census_data.etl_default_files()
 
 # call each of the files' relevant ETL function to read the file, transform it, and load into the database
 # first deal with the main data sets of card data

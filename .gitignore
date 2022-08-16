@@ -9,3 +9,4 @@ wh/
 */__pycache__/*
 personal_notes.md
 error_file.*
+generated_data/distinct_trips.csv

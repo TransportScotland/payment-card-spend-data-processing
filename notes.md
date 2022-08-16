@@ -47,5 +47,30 @@ Time inserting (with transformations) of 1 million rows:
 * 4 batches of 1k ended up slower than 1 batch of 4k for each thread
 
 
+# notes on database choice
+
+There is a lot of data, and Power BI downloads data into the local pbix file by default, which won't work with how much data there is. Luckily, it also supports querying the database directly using the Direct Query option instead of Import. Unfortunately, This only works with a very limited set of data sources (with MySQL strangely missing). Furthermore, most OLTP RDBMSs store data as rows, which is much much slower for analysis tasks than storing it by columns. This leads to a few options for storing our data:
+
+* MariaDB. An open source fork of MySQL by its original creators (after MySQL was acquired by Oracle). It supports a ColumnStore engine, but only on Linux. Which would be fine, but then Power BI says it supports Direct Query but when it comes to actually showing any visualisations, it is unable to create even the most basic ones, saying it was unable to fold the query. This may be a kink with my installation of Power BI so this is to be confirmed.
+* PostgreSQL with Citus extension. (Citus gives a column store option). Should work but I do not want to risk it
+* Apache Spark with Parquet files or Hive. Again don't want to risk changing everything for it to just not work. But may be the fastest open source option.
+* Google BigQuery or Amazon RedShift. Made for real-time queries on much bigger data sets so will likely be the fastest, but they cost money - although it is a small amount of money - BigQuery is $5 per 1TB of queries, with the first 1TB every month being free (1TB is roughly 50 queries on the current dataset of 1 year). Storage is $0.02 per GB with first 10GB per month free (so $0.2 for our 20GB data, or $0.4 without the free 10GB). But using it with Power BI may produce more queries than expected at first which may end up costing a lot.
+* Microsoft SQL Server. Column stores unclear how good, will need to create a columnar index on every column. This is the most likely to work, but potentially the most expensive. Developer edition is free but not allowed to be used in production - whether that applies to our case is a mystery.
+* Another option is to use Tableau or Talend with self-hosted MariaDB or other db in the hope that they will work better together.
+    * If using Tableau or Talend, there may be more options yet, like Clickhouse
+
+
+# Other options for data visualisations
+
+* Power BI
+* Tableau 
+* Apache Superset
+    * FOSS
+    * may need to know SQL?
+* Dash (Plotly)
+    * looks really cool for data vis but deals with pandas dataframes which won't fit in memory for us
+* Metabase (not owned by Facebook/Meta despite the name)
+
+
 # maps
 For adding maps to metabase, see https://www.metabase.com/docs/latest/administration-guide/20-custom-maps.html. Also consider UK postcode district shape maps https://github.com/missinglink/uk-postcode-polygons. Sector maps are not readily available but can be created with open source code.
