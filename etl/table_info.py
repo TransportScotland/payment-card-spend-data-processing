@@ -19,7 +19,7 @@ headers_dict = {
         'time_id', 'merchant_id', 'transport_mode_id'),
     'time': ('raw', 'year', 'quarter', 'month', 'id'),
     'location': ('location', 'sector', 'district', 'area', 'region', 'location_level',
-        'latitude', 'longitude', 'population', 'area_size', 'density', 'id'),
+        'latitude', 'longitude', 'population', 'area_size', 'id'),
     'category': ('category', 'id'),
     'm_channel': ('m_channel', 'id'),
     'purpose': ('purpose', 'id'),
@@ -115,7 +115,6 @@ if rdbms == 'mysql':
         "longitude FLOAT,"
         "population INT,"
         "area_size INT,"
-        "density FLOAT,"
         "id INT NOT NULL,"
         "PRIMARY KEY (id)"
         # " ENGINE=ColumnStore"
