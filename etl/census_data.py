@@ -43,20 +43,68 @@ def prepare_eng_wal_census_df(census_fpaths):
     dfcs = [pd.read_csv(path, header=None, skiprows=1) for path in census_fpaths]
     dfc = pd.concat(dfcs)
     dfc = dfc.rename(columns={0: 'postcode', 1:'population', 2: 'pop_male', 3: 'pop_female'})
-    # print(dfc)
 
     dfc = dfc.convert_dtypes()
-    # print(dfc)
     dfc['sector'] = dfc['postcode'].str[:-2]
     # change AB102 to AB10 2
     dfc = dfc.groupby('sector')[['population', 'pop_male', 'pop_female']].sum()
     dfc = dfc.reset_index()
     # add missing spaces
-    dfc.loc[dfc['sector'].str[3] != ' ', 'sector'] = dfc['sector'].str[:4] + ' ' + dfc['sector'].str[3:]
+    dfc.loc[dfc['sector'].str[3] != ' ', 'sector'] = dfc['sector'].str[:4] + ' ' + dfc['sector'].str[-1]
     # replace multiple spaces with one space
     dfc['sector'] = dfc['sector'].str.replace('  ', ' ', regex=False) 
     return dfc
 
+def assign_proportional_numbers_ni(df1: pd.DataFrame, df1_end :pd.DataFrame):
+    # return df1
+    pass
+    rows = df1_end.to_numpy().tolist()[4:8]
+    strs = [row[0] for row in rows]
+    num_strs = [s.split(':')[1].replace(',', '') for s in strs]
+    num_ints = [int(num) for num in num_strs]
+
+    unassigned_total, unassigned_m, unassigned_f, _ = num_ints
+
+    count_stars = (df1['population'] == '*').to_list().count(True)
+    count_na= df1['population'].isna().to_list().count(True)
+    count_invalid = count_stars + count_na
+
+    val_t = unassigned_total / count_invalid
+    val_m = unassigned_m / count_invalid
+    val_f = unassigned_f / count_invalid
+
+    df1.loc[df1['population'] == '*', 'population'] = val_t
+    df1.loc[df1['population'] == '*', 'pop_male'] = val_m
+    df1.loc[df1['population'] == '*', 'pop_female'] = val_f
+    df1.loc[df1['population'].isna(), 'population'] = val_t
+    df1.loc[df1['population'].isna(), 'pop_male'] = val_m
+    df1.loc[df1['population'].isna(), 'pop_female'] = val_f
+    return df1
+
+def prepare_ni_census_df(table1_fpath, table2_fpath):
+    # NI census is different yet again, it shows totals for supressed districts in a separate table
+    df1 = pd.read_csv(table1_fpath, header=None, skiprows=6)#, skipfooter=9)
+    df1_end = df1[-9:]
+    df1 = df1[:-9]
+    df1 = df1.rename(columns= {0: 'postcode', 1:'population', 2: 'pop_male', 3: 'pop_female'})
+
+    df1 = assign_proportional_numbers_ni(df1, df1_end)
+
+    for col in ['population', 'pop_male', 'pop_female']:
+        df1[col] = pd.to_numeric(df1[col], errors='coerce')
+
+    df1['sector'] = df1['postcode'].str[:-2]
+    df1 = df1.groupby('sector')[['population', 'pop_male', 'pop_female']].sum()
+    df1 = df1.reset_index()
+    # add missing spaces
+    df1.loc[df1['sector'].str[3] != ' ', 'sector'] = df1['sector'].str[:4] + ' ' + df1['sector'].str[-1]
+    # replace multiple spaces with one space
+    df1['sector'] = df1['sector'].str.replace('  ', ' ', regex=False) 
+    return df1
+
+    # df2 = pd.read_csv(table2_fpath)
+    # print(df2)
+    # pass
 
 
 def collect_locations(dfm: pd.DataFrame):
@@ -90,8 +138,9 @@ def collect_locations(dfm: pd.DataFrame):
     dfmc = drill_up(dfm, 'country', 'POSTCODE_COUNTRY', cols_first=None)
     df  = pd.concat([dfms, dfmd, dfma, dfmc])
 
-    return df
+    df[['population', 'pop_male', 'pop_female']] = df[['population', 'pop_male', 'pop_female']].round(0).astype('Int64')
 
+    return df
 
 def get_density(df):
     return df['population'] / df['area_size']
@@ -111,14 +160,15 @@ def to_dimension(df):
     return loc_dim
 
 
-def etl(postcode_fpath, census_scotland_fpath, census_eng_wal_fpaths):
+def etl(postcode_fpath, census_scotland_fpath, census_eng_wal_fpaths, census_ni_fpaths):
     # might actually be better using pandas here than my own solution because I'm merging two tables
     import pandas as pd
     
     dfp = prepare_postcode_info_df(postcode_fpath)
     dfc_scot = prepare_scotland_census_df(census_scotland_fpath)
     dfc_engw = prepare_eng_wal_census_df(census_eng_wal_fpaths)
-    dfc = pd.concat([dfc_scot, dfc_engw])
+    dfc_ni = prepare_ni_census_df(census_ni_fpaths[0], census_ni_fpaths[1])
+    dfc = pd.concat([dfc_scot, dfc_engw, dfc_ni])
     dfm = dd.merge(dfp, dfc, left_on='sector', right_on='sector', how='outer')
 
     df = collect_locations(dfm)
@@ -136,4 +186,5 @@ def etl(postcode_fpath, census_scotland_fpath, census_eng_wal_fpaths):
 if __name__ == '__main__':
     # etl('other_data/KS101SC.csv')
     engw_census_fpaths = [f'other_data/Postcode_Estimates_1_{letters}.csv' for letters in ['A_F', 'G_L', 'M_R', 'S_Z']]
-    etl('other_data/open_postcode_geo.csv', 'other_data/KS101SC.csv', engw_census_fpaths)
+    ni_census_fpaths = ['other_data/ni_census_table1.csv', 'other_data/ni_census_table2.csv']
+    etl('other_data/open_postcode_geo.csv', 'other_data/KS101SC.csv', engw_census_fpaths, ni_census_fpaths)
