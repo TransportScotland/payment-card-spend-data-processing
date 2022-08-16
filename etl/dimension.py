@@ -186,7 +186,7 @@ class LocationDimension(Dimension):
                 sector, area, district, region = self.postcode_sector_to_loc_list(loc)
             else:
                 sector, area, district, region = None, None, None, None
-            id = self.add_if_not_in(loc,(loc, sector, area, district, region, loc_level, None, None, None, None, None))
+            id = self.add_if_not_in(loc,(loc, sector, area, district, region, loc_level, None, None, None, None))
         else:
             # print('recognised: '+ loc)
             id = self.indices_dict[loc]

@@ -145,15 +145,17 @@ def collect_locations(dfm: pd.DataFrame):
 def get_density(df):
     return df['population'] / df['area_size']
 
-def to_dimension(df):
+def to_dimension(df: pd.DataFrame):
     #         'location', 'sector', 'district', 'area', 'region',  'location_level', 'population', 'area_ha',   'id'
     cols = ['location', 'sector', 'district', 'area', 'country', 'location_level', 
         'lat', 'lng','population', 'area_size']
     dfd = df[cols]
+    dfd = dfd.set_index('location', drop=False)
+    dfd = dfd.T # transpose
     import numpy as np
     dfd = dfd.replace(to_replace=np.nan, value=None) # replace pandas NaNs with NoneType Nones, so they can be NULL in the db
-    dfl = dfd.to_numpy().tolist()
-    dfd = {row[0]: tuple(row) for row in dfl}
+    dfd = dfd.to_dict('list')
+    dfd = {k: tuple(v) for k,v in dfd.items()}
 
     import dimension
     loc_dim : dimension.LocationDimension = dimension.LocationDimension._from_dict(dfd ,headers= cols)
@@ -182,9 +184,11 @@ def etl(postcode_fpath, census_scotland_fpath, census_eng_wal_fpaths, census_ni_
 
     pass
 
-# call the etl function if this file is run as a stand-alone program
-if __name__ == '__main__':
-
+def etl_default_files():
     engw_census_fpaths = [f'other_data/Postcode_Estimates_1_{letters}.csv' for letters in ['A_F', 'G_L', 'M_R', 'S_Z']]
     ni_census_fpaths = ['other_data/ni_census_table1.csv', 'other_data/ni_census_table2.csv']
     etl('other_data/open_postcode_geo.csv', 'other_data/KS101SC.csv', engw_census_fpaths, ni_census_fpaths)
+
+# call the etl function if this file is run as a stand-alone program
+if __name__ == '__main__':
+    etl_default_files()

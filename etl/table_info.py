@@ -30,7 +30,7 @@ headers_dict = {
 
 create_strings = {}
 
-rdbms = 'postgresql'
+rdbms = 'mysql'
 if rdbms == 'mysql':
 
     create_strings['fact1'] = ( 
