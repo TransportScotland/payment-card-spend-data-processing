@@ -4,7 +4,7 @@ import pandas as pd
 import dask.dataframe as dd
 
 def prepare_postcode_info_df(postcode_fpath):
-    dfp = dd.read_csv(postcode_fpath, header=None, blocksize='16MB', dtype={7: object, 8:object, 3:object, 4:object})
+    dfp = dd.read_csv(postcode_fpath, header=None, dtype={7: object, 8:object, 3:object, 4:object})
     dfp = dfp[[0,1,2,6,7,8,9,12,13,14]]
     dfp = dfp.rename(columns={0: 'postcode', 1: 'status', 2: 'usertype', 6:'country', 7:'lat', 8:'lng', 
         9:'postcode_no_space', 12: 'area', 13:'district', 14:'sector'})
@@ -184,7 +184,7 @@ def etl(postcode_fpath, census_scotland_fpath, census_eng_wal_fpaths, census_ni_
 
 # call the etl function if this file is run as a stand-alone program
 if __name__ == '__main__':
-    # etl('other_data/KS101SC.csv')
+
     engw_census_fpaths = [f'other_data/Postcode_Estimates_1_{letters}.csv' for letters in ['A_F', 'G_L', 'M_R', 'S_Z']]
     ni_census_fpaths = ['other_data/ni_census_table1.csv', 'other_data/ni_census_table2.csv']
     etl('other_data/open_postcode_geo.csv', 'other_data/KS101SC.csv', engw_census_fpaths, ni_census_fpaths)
