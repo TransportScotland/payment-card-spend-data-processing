@@ -6,6 +6,7 @@
 # import python libraries
 import time
 import MySQLdb
+import clickhouse_driver
 from collections import deque
 
 # import my python modules
@@ -224,7 +225,8 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
             except KeyboardInterrupt as ke:
                 raise ke
             except Exception as e:
-                error_rows.append((e, row))
+                error_rows.append(tuple(e, row))
+                raise e
 
             if len(batch) == maxlen:
                 
@@ -236,8 +238,8 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
 
                     latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
                     batch = deque([], maxlen=maxlen) # empty the queue here
-                except MySQLdb.DataError as mde:
-                    error_rows.append((mde, batch))
+                # except MySQLdb.DataError as mde:
+                #     error_rows.append((mde, batch))
                 # except TimeoutError
                 except KeyboardInterrupt as ke:
                     raise ke
@@ -302,10 +304,30 @@ def save_dims():
     dbcon.commit()
     dbcon.close()
 
+class ClickhouseCursorClient:
+    def __init__(self, client):
+        self.client = client
+    def cursor(self):
+        return self
+    def commit(self):
+        pass
+    def close(self):
+        self.client.disconnect()
+    def execute(self, *args):
+        return self.client.execute(*args)
+    def executemany(self, sql, values):
+        sqlnoval = sql.split('%')[0][:-1]
+        return self.client.execute(sqlnoval, values)
+        print(sql)
+        print(values)
+
+
 # TODO make this adjustable
-def connect_to_db() -> MySQLdb.Connection:
+def connect_to_db():# -> MySQLdb.Connection:
     """Get MySQLdb connection to default database."""
-    db = MySQLdb.connect(user='temp_user', passwd = 'password', database='sgov')
+    db = clickhouse_driver.Client(host='localhost', password='RadicalSpiderWearingPaper')
+    db = ClickhouseCursorClient(db)
+    # db = MySQLdb.connect(host='localhost:9004',user='temp_user', passwd = 'password', database='sgov')
     # import psycopg2
     # db = psycopg2.connect(database='sgov_mini', user='temp_user', password='password')
     # c = db.cursor()
@@ -314,7 +336,8 @@ def connect_to_db() -> MySQLdb.Connection:
 def get_sqlalchemy_con():
     """Get SQLAlchemy engine for the database"""
     import sqlalchemy
-    return sqlalchemy.create_engine('mysql://', creator=connect_to_db)
+    return sqlalchemy.create_engine('clickhouse://', creator= lambda :connect_to_db().client)
+    # return sqlalchemy.create_engine('mysql://', creator=connect_to_db)
 
 
 # A lot of wrapper functions which are mostly here for historic purposes. But may be good to keep anyway in case changes are wanted.

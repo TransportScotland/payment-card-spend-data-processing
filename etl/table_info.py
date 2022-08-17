@@ -30,7 +30,7 @@ headers_dict = {
 
 create_strings = {}
 
-rdbms = 'mysql'
+rdbms = 'clickhouse'
 if rdbms == 'mysql':
 
     create_strings['fact1'] = ( 
@@ -161,6 +161,146 @@ if rdbms == 'mysql':
         # " ENGINE=ColumnStore"
         ")")
 
+elif (rdbms == 'clickhouse'):
+
+    create_strings['fact1'] = ( 
+        "CREATE TABLE fact1 ("
+        "id INT UNSIGNED NOT NULL,"
+        "pan_cnt BIGINT UNSIGNED NOT NULL,"
+        "txn_cnt BIGINT UNSIGNED NOT NULL,"
+        "txn_gbp_amt FLOAT NOT NULL,"
+        "time_id INT NOT NULL,"
+        "cardholder_id INT NOT NULL,"
+        "merchant_id INT NOT NULL,"
+        "cat1_id INT NOT NULL,"
+        "cat2_id INT NOT NULL,"
+        "cat3_id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
+
+    create_strings['fact2'] = ( 
+        "CREATE TABLE fact2 ("
+        "id INT UNSIGNED NOT NULL,"
+        "pan_cnt BIGINT UNSIGNED NOT NULL,"
+        "txn_cnt BIGINT UNSIGNED NOT NULL,"
+        "txn_gbp_amt FLOAT NOT NULL,"
+        "merchant_outlet_count INT UNSIGNED NOT NULL,"
+        "percent_repeat FLOAT NOT NULL,"
+        "time_id INT NOT NULL,"
+        "cardholder_id INT NOT NULL,"
+        "category_id INT NOT NULL,"
+        "m_channel_id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
+
+    create_strings['fact3'] = ( 
+        "CREATE TABLE fact3 ("
+        "id INT UNSIGNED NOT NULL,"
+        "perc_rail FLOAT NOT NULL,"
+        "pan_cnt BIGINT UNSIGNED NOT NULL,"
+        "txn_cnt BIGINT UNSIGNED NOT NULL,"
+        "txn_gbp_amt FLOAT NOT NULL,"
+        "time_id INT NOT NULL,"
+        "merchant_id INT NOT NULL,"
+        "jour_purpose_id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
+
+    create_strings['fact4'] = ( 
+        "CREATE TABLE fact4 ("
+        "id INT UNSIGNED NOT NULL,"
+        "perc_jour FLOAT NOT NULL,"
+        "perc_pan FLOAT NOT NULL,"
+        "time_id INT NOT NULL,"
+        "merchant_id INT NOT NULL,"
+        "transport_mode_id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
+
+    create_strings['time'] = ( 
+        "CREATE TABLE time ("
+        "raw String NOT NULL,"
+        "year INT NOT NULL,"
+        "quarter INT NOT NULL,"
+        "month Nullable(Int8)," # could also month_name varchar
+        "id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
+
+    #     'location': ('location', 'sector', 'district', 'area', 'region', 'location_level', 'population', 'area_ha', 'id'),
+    create_strings['location'] = ( 
+        "CREATE TABLE location ("
+        "location String NOT NULL,"
+        "sector Nullable(String),"
+        "district Nullable(String),"
+        "area Nullable(String),"
+        "region Nullable(String),"
+        "location_level String NOT NULL,"
+        "latitude Nullable(Float32),"
+        "longitude Nullable(Float32),"
+        "population Nullable(Int32),"
+        "area_size Nullable(Int32),"
+        "id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
+
+    create_strings['category'] = ( 
+        "CREATE TABLE category ("
+        "category String NOT NULL,"
+        "id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
+
+    create_strings['m_channel'] = ( 
+        "CREATE TABLE m_channel ("
+        "m_channel String NOT NULL,"
+        "id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
+
+    create_strings['purpose'] = ( 
+        "CREATE TABLE purpose ("
+        "purpose String NOT NULL,"
+        "id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
+
+    create_strings['transport_mode'] = ( 
+        "CREATE TABLE transport_mode ("
+        "transport_mode String NOT NULL,"
+        "id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
+
+    create_strings['census'] = ( 
+        "CREATE TABLE census ("
+        "location String NOT NULL," # maybe longer later if needed total scotland
+        "population INT NOT NULL,"
+        "id INT NOT NULL,"
+        # "PRIMARY KEY (id)"
+        ")"
+        " ENGINE=MergeTree() order by id"
+    )
 
 
 

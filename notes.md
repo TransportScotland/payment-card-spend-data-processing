@@ -14,6 +14,15 @@ Every dimension table insertion returns an ID, which is then used in much the sa
 
 The main functions to look at when trying to understand this code are fileX.etl(), batch_process_threaded_from_generator() (pending rename), and fileX.create_dims (also pending rename)
 
+# To change Clickhouse directory
+
+0. stop clickhouse server service: `sudo service clickhouse-server stop`
+1. change some or all mentions of `/var/lib/clickhouse` to `/my_directory/clickhouse` in the file `/etc/clickhouse-server/config.xml`
+2. Try restarting the service with `sudo service slickhouse-server start`. This has a high chance of not working just by itself (esp on mounted disks), so 
+3. Change the permissions of your new data folder. Clickhouse needs to read, write, and execute in this folder, so, assuming the folder already exists:
+    `sudo chmod o+rwx /my_directory/clickhouse`
+
+
 
 # Code snippets
 ## SQL add user
