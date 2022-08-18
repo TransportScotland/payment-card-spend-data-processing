@@ -21,8 +21,8 @@ census_data.etl_default_files()
 
 f1p = 'data/module1_sample.csv'
 f2p = 'data/module2_sample.csv'
-# f1p = '/mnt/sftp/module 1/san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2021.csv'
-# f2p = '/mnt/sftp/module 2/san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_2_2021.csv'
+f1p = '/mnt/sftp/module 1/san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2021.csv'
+f2p = '/mnt/sftp/module 2/san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_2_2021.csv'
 file1.etl(f1p) # smaller file for testing purposes
 file2.etl(f2p)
 # file3.etl('data/file3.csv')

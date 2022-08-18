@@ -19,18 +19,20 @@ def etl(distances_matrix_files):
 
     # load in census data to match location IDs
     # TODO consider loading location table instead (a subset of census table)
-    locs = pd.read_sql(
-        sql='select location, id from location;', 
-        con=shared_funcs.get_sqlalchemy_con()
-        )
+    # locs = pd.read_sql(
+    #     sql='select location, id from location;', 
+    #     con=shared_funcs.get_sql_alchemy_con_for_read()
+    #     )
         # con=sqlalchemy.create_engine(
         #     'mysql://temp_user:password@localhost/sgov', 
         #     )
         # )
 
     # turn the locations df into a dictionary {location -> location_id_from_census_table}
-    loc_to_id : dict = locs.set_index('location').to_dict() # gets dict like {'id': {'AB10 1':1, 'DD1 4': 2, ...}}
-    loc_to_id = loc_to_id['id'] # get the actual column dictionary from what df.to_dict returns
+    # loc_to_id : dict = locs.set_index('location').to_dict() # gets dict like {'id': {'AB10 1':1, 'DD1 4': 2, ...}}
+    # loc_to_id = loc_to_id['id'] # get the actual column dictionary from what df.to_dict returns
+    locs = shared_funcs.dicts['location']
+    loc_to_id = {loca[0]: id for id, loca in enumerate(locs.dim_list)}
     loc_to_id['origin'] = 'origin' # for mapping later. one of the columns is called 'origin' and we want to keep that name
 
 
@@ -67,7 +69,7 @@ def etl(distances_matrix_files):
     
     # save to database
     # sqlcon = sqlalchemy.create_engine('mysql://', creator=shared_funcs.connect_to_db)
-    sqlcon = shared_funcs.get_sqlalchemy_con()
+    sqlcon = shared_funcs.get_sql_alchemy_con_for_read()
     df.to_sql(
         'durations', 
         con=sqlcon, 
