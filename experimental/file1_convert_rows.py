@@ -5,7 +5,7 @@
 
 #currently just a proof of concept.
 # takes about 1.1s per 1 million rows when handling only time
-# saving in batches is faster (though not crazy - 0.93s vs 1.09s)
+# saving in batches is faster (though not by much - 0.93s vs 1.09s)
 
 import time 
 
