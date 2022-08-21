@@ -3,3 +3,6 @@ This repository contains data obtained from OpenRouteService (ORS), https://open
 
 The code uses data from Scotland's Census (https://www.scotlandscensus.gov.uk/) and Open Postcode Geo (https://www.getthedata.com/open-postcode-geo), licensed under the Open Government Licence. 
 The data is not copied in this repository but a full attribution will be provided soon.
+
+Postcode sector/district/area polygons credit:
+Postal Boundaries © GeoLytix copyright and database right 2012 Contains Ordnance Survey data © Crown copyright and database right 2012 Contains Royal Mail data © Royal Mail copyright and database right 2012 Contains National Statistics data © Crown copyright and database right 2012.

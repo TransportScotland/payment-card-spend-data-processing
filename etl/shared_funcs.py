@@ -6,6 +6,7 @@
 # import python libraries
 import time
 import MySQLdb
+import clickhouse_driver
 from collections import deque
 
 # import my python modules
@@ -97,20 +98,35 @@ def __raise_not_numeric(row_cell, row):
     raise ValueError('All elements in the fact table must be numerical to prevent SQL injection attacks.' +
         f'Instead found: element {row_cell} of type {type(row_cell)} in row {row}')
 
+def _row_cell_to_numbers(row_cell, row = None):
+
+    if(type(row_cell) == int or type(row_cell) == float):
+        return row_cell
+    else:
+        # raise an exception if not a number but chceck numeric strings
+        if (type(row_cell) == str):
+            try:
+                # throws a ValueError if string not convertible to int
+                row_cell = int(row_cell)
+                return row_cell
+            except ValueError:
+                try:
+                    # throw a ValueError if string not convertible to float
+                    row_cell = float(row_cell)
+                    return row_cell
+                except ValueError:
+                    __raise_not_numeric(row_cell, row)
+        else:
+            __raise_not_numeric(row_cell, row)
 
 def _raise_if_not_int_float(list_of_rows):
-    for row in list_of_rows:
-        for row_cell in row:
-            if(not(type(row_cell) == int or type(row_cell) == float)):
-                # raise an exception if not a number but chceck numeric strings
-                if (type(row_cell) == str):
-                    try:
-                        # throw a ValueError if string not convertible to float
-                        _ = float(row_cell)
-                    except ValueError:
-                        __raise_not_numeric(row_cell, row)
-                else:
-                    __raise_not_numeric(row_cell, row)
+    # out = []
+    for i,row in enumerate(list_of_rows):
+        list_of_rows[i] = [_row_cell_to_numbers(row_cell) for row_cell in row]
+        # print(row)
+        # print(list_of_rows[i])
+        # out.append(row)
+    # return out
 
 def save_batch(batch, dbcon, table_name):
     """
@@ -121,7 +137,7 @@ def save_batch(batch, dbcon, table_name):
         So should be safe but do procees with caution.
     """
 
-    values = batch
+    values = list(batch)
 
     # prepare the headers part of the SQL query
     headers = table_info.headers_dict[table_name]
@@ -131,16 +147,22 @@ def save_batch(batch, dbcon, table_name):
 
     # raise an Exception if anything of type other than (float, int) comes in
     # be very careful removing the following line, will need to escape string if anything other than numbers comes in.
+    # print(1)
+    # values = 
     _raise_if_not_int_float(values)
+    # print(2)
+    # print(values[:10])
+    dbcon.cursor().execute(sql_base, values)
+    # print(f'saved to ch')
 
     # each row in values is a tuple so str(v) is (e1, e2, e3, ...) already, and just put commas in between each
-    values_str = ','.join([str(v) for v in values])
-    bigsql = sql_base + values_str
-    if values_str == "":
-        raise Exception("batch was empty in save_batch")
-    
-    dbcon.cursor().execute(bigsql)
-    dbcon.commit()
+    # values_str = ','.join([str(v) for v in values])
+    # bigsql = sql_base + values_str
+    # if values_str == "":
+    #     raise Exception("batch was empty in save_batch")
+    # 
+    # dbcon.cursor().execute(bigsql)
+    # dbcon.commit()
 
 def save_batch_timed(*args):
     """Call save_batch and time how long it took"""
@@ -189,11 +211,16 @@ def save_errors(error_rows):
         # file.write('\n')
         file.write(str([f'{time.time()}: {str(e)}\n' for e in error_rows]))
 
+def clear_error_file():
+    with open('error_file.txt', 'w') as file:
+        file.write('')
+
 import concurrent.futures
 def batch_process_threaded_from_generator(row_generator, row_func, fact_table_name, dbcon, if_exists='fail', **row_func_kwargs):
     start_time = time.time()
     maxlen = 4000 # 16s. 1000 21s, 10000 17s
     error_rows= []
+    clear_error_file()
     batch = deque([], maxlen=maxlen)
     # also consider multiprocessing Queue - one shared queue between threads, and just save as it fills up (or like a queue of batches even)
 
@@ -222,9 +249,13 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
                 district_rows.append(row)
                 continue # skip the rest of the execution for this line here
             except KeyboardInterrupt as ke:
+                save_errors(error_rows[:100])
                 raise ke
             except Exception as e:
-                error_rows.append((e, row))
+                error_rows.append(tuple(e, row))
+                if (len(error_rows)>100):
+                    # too many errors
+                    raise e
 
             if len(batch) == maxlen:
                 
@@ -236,13 +267,16 @@ def batch_process_threaded_from_generator(row_generator, row_func, fact_table_na
 
                     latest_future = executor.submit(save_batch_timed, batch, dbcon, fact_table_name)
                     batch = deque([], maxlen=maxlen) # empty the queue here
-                except MySQLdb.DataError as mde:
-                    error_rows.append((mde, batch))
+                # except MySQLdb.DataError as mde:
+                #     error_rows.append((mde, batch))
                 # except TimeoutError
                 except KeyboardInterrupt as ke:
                     raise ke
                 except Exception as e:
                     error_rows.append((e, batch))
+                    if (len(error_rows)>100):
+                        # too many errors
+                        raise e
             
             if error_rows and len(error_rows) >=1000:
                 save_errors(error_rows)
@@ -302,10 +336,37 @@ def save_dims():
     dbcon.commit()
     dbcon.close()
 
+class ClickhouseCursorClient:
+    def __init__(self, client):
+        self.client = client
+    def cursor(self):
+        return self
+    def commit(self):
+        pass
+    def close(self):
+        self.client.disconnect()
+    def execute(self, *args, **kwargs):
+        return self.client.execute(*args, **kwargs)
+    def executemany(self, sql, values):
+        sqlnoval = sql.split('%')[0][:-1]
+        return self.client.execute(sqlnoval, values)
+        print(sql)
+        print(values)
+
+dbpassword = None
+
+def getDbPassword():
+    if dbpassword:
+        return dbpassword
+    else:
+        dbpassword = input("Please enter the database password ")
+        return dbpassword
 # TODO make this adjustable
-def connect_to_db() -> MySQLdb.Connection:
+def connect_to_db():# -> MySQLdb.Connection:
     """Get MySQLdb connection to default database."""
-    db = MySQLdb.connect(user='temp_user', passwd = 'password', database='sgov')
+    db = clickhouse_driver.Client(host='localhost', password = dbpassword, database='sgov')
+    db = ClickhouseCursorClient(db)
+    # db = MySQLdb.connect(host='localhost:9004',user='temp_user', passwd = 'password', database='sgov')
     # import psycopg2
     # db = psycopg2.connect(database='sgov_mini', user='temp_user', password='password')
     # c = db.cursor()
@@ -314,8 +375,13 @@ def connect_to_db() -> MySQLdb.Connection:
 def get_sqlalchemy_con():
     """Get SQLAlchemy engine for the database"""
     import sqlalchemy
-    return sqlalchemy.create_engine('mysql://', creator=connect_to_db)
+    return sqlalchemy.create_engine('clickhouse://', creator= lambda :connect_to_db().client)
+    # return sqlalchemy.create_engine('mysql://', creator=connect_to_db)
 
+def get_sql_alchemy_con_for_read():
+    import sqlalchemy
+    return sqlalchemy.create_engine(f'clickhouse+native://default:{dbpassword}@localhost:8123')
+    return sqlalchemy.create_engine('clickhouse://', creator= lambda :connect_to_db())
 
 # A lot of wrapper functions which are mostly here for historic purposes. But may be good to keep anyway in case changes are wanted.
 #TODO change explicit args to *args or **kwargs

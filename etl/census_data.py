@@ -13,7 +13,7 @@ def prepare_postcode_info_df(postcode_fpath):
     dfp = dfp[dfp['usertype'] == 'small']
 
     dfp['lat'] = dd.to_numeric(dfp['lat'], errors='coerce')
-    dfp['lng'] = dd.to_numeric(dfp['lat'], errors='coerce')
+    dfp['lng'] = dd.to_numeric(dfp['lng'], errors='coerce')
 
     avg_locs = dfp.groupby('sector')[['lat', 'lng']].mean()
 
@@ -153,6 +153,12 @@ def to_dimension(df: pd.DataFrame):
     dfd = dfd.set_index('location', drop=False)
     dfd = dfd.T # transpose
     import numpy as np
+
+    seen = set()
+    a=dfd.columns.to_list()
+    dupes = [x for x in a if x in seen or seen.add(x)]   
+    print(dupes)
+    
     dfd = dfd.replace(to_replace=np.nan, value=None) # replace pandas NaNs with NoneType Nones, so they can be NULL in the db
     dfd = dfd.to_dict('list')
     dfd = {k: tuple(v) for k,v in dfd.items()}
