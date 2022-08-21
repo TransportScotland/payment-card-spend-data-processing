@@ -6,3 +6,6 @@ The data is not copied in this repository but a full attribution will be provide
 
 Postcode sector/district/area polygons credit:
 Postal Boundaries © GeoLytix copyright and database right 2012 Contains Ordnance Survey data © Crown copyright and database right 2012 Contains Royal Mail data © Royal Mail copyright and database right 2012 Contains National Statistics data © Crown copyright and database right 2012.
+
+Postcode regions that areas correspond to (other_data/postcode_regions.tsv) (Gibraltar added):
+https://www.robertsharp.co.uk/2017/08/09/a-table-that-shows-the-uk-region-for-all-postcode-districts/
