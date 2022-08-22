@@ -179,7 +179,7 @@ def getDbPassword():
         dbpassword = input("Please enter the database password ")
         return dbpassword
 
-def csv_to_db(fpath):
+def csv_to_db_create(fpath):
     import os
 
     database_name = 'tempdb'
@@ -220,17 +220,24 @@ def csv_to_db(fpath):
         "ORDER BY (time_frame, cardholder_location, merchant_location)"
         ';"')
 
-    os.system((f'clickhouse-client --password={getDbPassword()}'
+def csv_to_db_add(fpath):
+    import subprocess
+    database_name = 'tempdb'
+
+    subprocess.Popen((f'clickhouse-client --password={getDbPassword()}'
     ' --format_csv_delimiter="|"'
     ' --input_format_csv_skip_first_lines=1'
-    f' --query="INSERT INTO {database_name}.module1 FORMAT CSV" < {fpath}'))
+    f' --query="INSERT INTO {database_name}.module1 FORMAT CSV" < "{fpath}"'),
+    shell=True).wait()
+
+
 
 
 
 def etl(infpath):
+    # todo look into alternative file types for the intermediate file
 
-
-    outfpath = 'data/tmp_module1_t1.csv'
+    outfpath = '/mnt/sftp/module 1/tmp_module1_t1.csv'
     errorfpath = 'error_file.txt'
     with open(infpath) as infile, open(outfpath, 'w') as outfile, open(errorfpath, 'w') as errorfile:
         prepare_distance_dict('generated_data/out_card_trips_car.csv')
@@ -245,6 +252,8 @@ def etl(infpath):
             'merchant_postal_town', 'merchant_postal_region',
             'driving_seconds'
          ]))
+        csv_to_db_create(outfpath)
+
         for line in infile:
             global line_num
             line_num += 1
@@ -276,8 +285,11 @@ def etl(infpath):
                 distance
             ])+ '\n') 
 
-
-    csv_to_db(outfpath)
+            if line_num % 1000 == 0:
+                csv_to_db_add(outfpath)
+                outfile.close()
+                outfile = open(outfpath, 'w')
+        csv_to_db_add(outfpath)
     
 
 
