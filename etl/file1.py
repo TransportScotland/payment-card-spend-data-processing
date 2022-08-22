@@ -141,7 +141,10 @@ def prepare_distance_dict(fpath):
         def line_to_dict(line):
             if (len(line) >=7 ):
                 try:
-                    return (line[0], line[1]), str(int(line[6]))
+                    i6 = int(line[6])
+                    if i6 < 0:
+                        i6 = NULL
+                    return (line[0], line[1]), str(i6)
                 except ValueError as ve:
                     return (line[0], line[1]), NULL
             elif (len(line) >= 2):
@@ -285,7 +288,7 @@ def etl(infpath):
                 distance
             ])+ '\n') 
 
-            if line_num % 1000 == 0:
+            if line_num % 100000 == 0:
                 csv_to_db_add(outfpath)
                 outfile.close()
                 outfile = open(outfpath, 'w')
