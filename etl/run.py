@@ -1,4 +1,4 @@
-import file1
+import file1, file2
 import distances_to_json, census_to_json
 import time
 
@@ -21,7 +21,10 @@ if __name__ == '__main__':
     time0 = time_step(time0, 'create census json')
 
     # file1.etl_sample_file()
-    file1.etl_real_files()
+    # file1.etl_real_files()
+
+    # file2.etl_sample_file()
+    file2.etl_real_files()
 
     # file1.etl(['data/module1_sample_10k.zip'])
     # file1.etl('/mnt/sftp/module 1/san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2021.csv')

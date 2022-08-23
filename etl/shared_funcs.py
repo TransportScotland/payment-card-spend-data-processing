@@ -14,30 +14,25 @@ def getDbPassword():
         dbpassword = input("Please enter the database password ")
         return dbpassword
 
+# to be filled in corresponding fileN.py files
+passwords_dict = {}
+zip_filenames_dict = {}
 
 #TODO load from a file
 def get_zip_pwd(infpath):
     import os
-    return {
-        'module1_sample_10k.zip': None,
-        'nr_module_1_2020.csv.zip': b'NetworkRail_2020',
-        'nr_module_1_2021.csv.zip': b'NetworkRail_2021',
-        'nr_module_1_2022.csv.zip': b'NetworkRail_2022',
-    }[os.path.basename(infpath)]
+    return passwords_dict[os.path.basename(infpath)]
+
 
 def get_filename_in_zip(infpath):
     import os
-    return {
-        'module1_sample_10k.zip': 'module1_sample_10k.csv',
-        'nr_module_1_2020.csv.zip': 'san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2020.csv',
-        'nr_module_1_2021.csv.zip': 'san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2021.csv',
-        'nr_module_1_2022.csv.zip': 'san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2022.csv',
-    }[os.path.basename(infpath)]
+    return zip_filenames_dict[os.path.basename(infpath)]
 
 def split_row_generator(infpaths, colsep, print_headers = True):
     for infpath in infpaths:
         import zipfile
         with zipfile.ZipFile(infpath) as zf:
+            # with zf.open(zf.namelist()[0], pwd = get_zip_pwd(infpath)) as infile: 
             with zf.open(get_filename_in_zip(infpath), pwd = get_zip_pwd(infpath)) as infile:
                 headers = next(infile)
                 if print_headers:
@@ -215,7 +210,7 @@ def apply_and_save(infpaths, row_function, dbinfo, *extra_params, **extra_named_
     # outfpath = '/mnt/sftp/module 1/tmp_module1_t1.csv'
     outfpath = 'data/tmp_to_save.csv'
     errorfpath = 'error_file.txt'
-    max_errors_before_crash = 1#00000
+    max_errors_before_crash = 100
     if dbinfo.dbname is None:
         dbinfo.dbname = 'nr'
     # consider moving this to CsvDatabaseWriter, with an optional append vs replace parameter
@@ -223,7 +218,7 @@ def apply_and_save(infpaths, row_function, dbinfo, *extra_params, **extra_named_
     colsep = '|'
 
 
-    with CsvDatabaseWriterThreaded(outfpath, 1002, dbinfo.dbname, dbinfo.table_name) as writer, \
+    with CsvDatabaseWriterThreaded(outfpath, 100000, dbinfo.dbname, dbinfo.table_name, timeout_s=60) as writer, \
             ErrorHandler(errorfpath, max_errors_before_crash, colsep) as error_handler:
         for split in split_row_generator(infpaths, colsep):
             try:

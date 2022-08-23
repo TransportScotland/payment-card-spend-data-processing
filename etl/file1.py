@@ -42,7 +42,7 @@ db_creation_string_columns = str(
             "merchant_location_level String NOT NULL,"
             "merchant_location String NOT NULL,"
             "pan_cnt UInt32 NOT NULL,"
-            "txn_cnt UInt32 NOT NULL,"
+            "txn_cnt UInt64 NOT NULL,"
             "txn_gbp_amt Float32 NOT NULL,"
             "mcc_rank1 String NOT NULL,"
             "mcc_rank2 String NOT NULL,"
@@ -71,6 +71,17 @@ db_creation_string_columns = str(
             "ORDER BY (time_frame, cardholder_location, merchant_location)"
 )
 
+
+passwords_dict['module1_sample_10k.zip']= None
+passwords_dict['nr_module_1_2020.csv.zip']= b'NetworkRail_2020'
+passwords_dict['nr_module_1_2021.csv.zip']= b'NetworkRail_2021'
+passwords_dict['nr_module_1_2022.csv.zip']= b'NetworkRail_2022'
+    
+zip_filenames_dict['module1_sample_10k.zip']= 'module1_sample_10k.csv'
+zip_filenames_dict['nr_module_1_2020.csv.zip']= 'san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2020.csv'
+zip_filenames_dict['nr_module_1_2021.csv.zip']= 'san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2021.csv'
+zip_filenames_dict['nr_module_1_2022.csv.zip']= 'san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2022.csv'
+
 def etl_sample_file():
     return etl(['data/module1_sample_10k.zip'], table_name='module1_sample')
 
@@ -79,8 +90,7 @@ def etl_real_files():
         '/mnt/sftp/module 1/nr_module_1_2021.csv.zip',
         '/mnt/sftp/in/nr_module_1_2020.csv.zip',
         '/mnt/sftp/in/nr_module_1_2022.csv.zip',
-        ])
-
+        ], table_name = 'module1_sample')
 
 def etl(infpaths, table_name = 'module1'):
     import time
