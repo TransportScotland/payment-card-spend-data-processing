@@ -56,6 +56,11 @@ Time inserting (with transformations) of 1 million rows:
 * 4 batches of 1k ended up slower than 1 batch of 4k for each thread
 
 
+* It may be really worth creating (materialzed) views of the whole database with quarterly vs monthly views, district vs sector area region views etc. bc currently monthly and quarterly data seems to be mixed together so some people are being counted twice and I need to filter by month being null
+
+# A note about BT1 5 postcode sector
+This one shows up in the top spots often when dividing by population. This is because in the 2011 census data, the BT1 5AB postcode was the only postcode in the data and it even had less than 10 inhabitants. Either the census data was wrong, or there are now more postcodes under the BT1 5 postcode sector, possibly re-assigned from other postcodes. So the anomaly is caused by census data, not our payment card data.
+
 # notes on database choice
 
 There is a lot of data, and Power BI downloads data into the local pbix file by default, which won't work with how much data there is. Luckily, it also supports querying the database directly using the Direct Query option instead of Import. Unfortunately, This only works with a very limited set of data sources (with MySQL strangely missing). Furthermore, most OLTP RDBMSs store data as rows, which is much much slower for analysis tasks than storing it by columns. This leads to a few options for storing our data:

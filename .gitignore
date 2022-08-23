@@ -11,3 +11,5 @@ personal_notes.md
 error_file.*
 generated_data/distinct_trips.csv
 generated_data/out_card_trips_car.csv
+generated_data/census_dict.json
+generated_data/distances_dict.json
