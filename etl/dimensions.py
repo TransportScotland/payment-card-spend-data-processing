@@ -57,19 +57,23 @@ def InvalidDataWarning (dimension, value, extra):
 
 
 def time_cols(time: str):
-    if len(time) == 6 :
-        # month data
-        year = time[0:4]
-        month = time[4:6].replace('0','')
-        quarter = int((int(month) - 1) / 3) + 1
-        pass
-    elif len(time) == 15:
+    if len(time) == 15:
         #quarter data
         year = '20' + time[4:6]
         month = NULL
         quarter = {
             'Jan': 1, 'Apr': 2, 'Jul': 3, 'Oct': 4
         }[time[0:3]]
+        pass
+    elif len(time) == 6 and time[4] == 'Q':
+        month = NULL
+        quarter = time[5]
+        year = time[0:4]
+    elif len(time) == 6 :
+        # month data
+        year = time[0:4]
+        month = time[4:6]
+        quarter = int((int(month) - 1) / 3) + 1
         pass
     else:
         # invalid time

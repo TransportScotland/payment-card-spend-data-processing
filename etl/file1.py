@@ -90,7 +90,7 @@ def etl_real_files():
         '/mnt/sftp/module 1/nr_module_1_2021.csv.zip',
         '/mnt/sftp/in/nr_module_1_2020.csv.zip',
         '/mnt/sftp/in/nr_module_1_2022.csv.zip',
-        ], table_name = 'module1_sample')
+        ], table_name = 'module1')
 
 def etl(infpaths, table_name = 'module1'):
     import time

@@ -223,7 +223,7 @@ def apply_and_save(infpaths, row_function, dbinfo, *extra_params, **extra_named_
         for split in split_row_generator(infpaths, colsep):
             try:
 
-                conv = row_function(split, *extra_params, *extra_named_parameters)
+                conv = row_function(split, *extra_params, **extra_named_parameters)
                 
                 writer.write(conv, colsep)
 
