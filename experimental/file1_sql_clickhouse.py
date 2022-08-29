@@ -124,7 +124,7 @@ def create_location_table(dbcon):
 #     pass
 
     
-dbpassword = 'RadicalSpiderWearingPaper'
+dbpassword = None
 
 def getDbPassword():
     global dbpassword

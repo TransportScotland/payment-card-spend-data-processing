@@ -69,14 +69,12 @@ def etl_real_files():
         '/mnt/sftp/in/nr_module_3_2021.csv.zip',
         # '/mnt/sftp/in/nr_module_3_2020.csv.zip',
         # '/mnt/sftp/in/nr_module_3_2022.csv.zip',
-        ], table_name = 'module3e')
+        ], table_name = 'module3')
 
 def etl(infpaths, table_name = 'module3'):
     import time
     time0= time.perf_counter()
-    # census_dict, dist_dict = {}, {}
     census_dict = load_census_dict()
-    # dist_dict = load_distance_dict()
     print(f'Loading census and distance dict took {time.perf_counter() - time0}s.')
 
     dbinfo = DBInfo(db_creation_string_columns, table_name = table_name)

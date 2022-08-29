@@ -4,9 +4,12 @@ from __future__ import annotations
 # TODO get rid of this global variable
 line_num = 0
 
-dbpassword = 'RadicalSpiderWearingPaper'
+dbpassword = None
 
 def getDbPassword():
+    """
+    Get the database password from the user and save for next time
+    """
     global dbpassword
     if dbpassword:
         return dbpassword
@@ -15,48 +18,68 @@ def getDbPassword():
         return dbpassword
 
 # to be filled in corresponding fileN.py files
-passwords_dict = {}
 zip_filenames_dict = {}
+passwords_dict = {}
 
-#TODO load from a file
-def get_zip_pwd(infpath):
+
+def get_zip_password(infpath):
+    """
+    Get zip password from passwords_dict, 
+    taking into account only the file name and not the directory part of its path
+    """
     import os
     return passwords_dict[os.path.basename(infpath)]
 
 
 def get_filename_in_zip(infpath):
+    """
+    Get file path of CSV file within the zip file from zip_filenames_dict, 
+    taking into account only the file name and not the directory part of its path
+    """
     import os
     return zip_filenames_dict[os.path.basename(infpath)]
 
 def split_row_generator(infpaths, colsep, print_headers = True):
+    """
+    Generates rows as lists of cells in the CSVs in the zip files.
+    Usage: for row in split_row_generator(['path/to/zip',], ',', True): do_stuff(row).
+    Do not do list(split_row_generator(...)), the rows won't fit into memory 
+    """
+    # for each zip file
     for infpath in infpaths:
         import zipfile
-        with zipfile.ZipFile(infpath) as zf:
-            # with zf.open(zf.namelist()[0], pwd = get_zip_pwd(infpath)) as infile: 
-            with zf.open(get_filename_in_zip(infpath), pwd = get_zip_pwd(infpath)) as infile:
+        with zipfile.ZipFile(infpath) as zf: 
+            # open the csv file in the zip file
+            with zf.open(get_filename_in_zip(infpath), pwd = get_zip_password(infpath)) as infile:
+                # skip the first line of headers
                 headers = next(infile)
                 if print_headers:
                     print(headers)
 
+                # for each line
                 for line in infile:
+                    # inrement line counter
                     global line_num
                     line_num += 1
 
-                    # if isinstance(line, bytes):
+                    # decode line (stored as bytes in zip, want string)
                     line = line.decode('utf-8')
-                    linestrip = line.rstrip()
-                    split = linestrip.split(colsep)
+                    linestrip = line.rstrip() # remove trailing newline
+                    split = linestrip.split(colsep) # split on the column separator
                     yield split
 
 
 import concurrent.futures
 class CsvDatabaseWriterThreaded:
+    """
+    A class to manage writing into a temporary csv and then the database.
+    Can be used similarly to writing to just a csv file. (Using python's 'with' block)
+    """
     def __init__(self, outfpath, batch_size, dbname, table_name, timeout_s = 10) -> None:
         self.executor = None
         self.latest_future = None
-        self.swapfpath = outfpath + '_2'
+        self.swapfpath = outfpath + '_2' # creates a second temporary file (one for each thread)
         self.timeout_s = timeout_s
-        # super().__init__(outfpath, batch_size, dbname, table_name)
 
         self.dbname = dbname
         self.batch_size = batch_size
@@ -65,66 +88,85 @@ class CsvDatabaseWriterThreaded:
         self.line_counter = 0
 
     def __enter__(self):
+        """Enables python 'with' block functionality"""
         self.executor = concurrent.futures.ThreadPoolExecutor()
-        # return super().__enter__()
-        self.open()
+        self.outfile = open(self.outfpath, 'w')
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        """Enables python 'with' block functionality"""
 
-        # first check if any lines left in current batch
+        # check if any lines left in current batch before exiting
         if self.line_counter % self.batch_size != 0:
-            # self.close_file_for_saving()
+            # save if there are
             self._save_to_db_single(self.outfile, self.outfpath)
+        # tell file and thread executor to also stop
         self.outfile.__exit__(exc_type, exc_value, traceback)
         self.executor.__exit__(exc_type, exc_value, traceback)
-        # return super().__exit__(exc_type, exc_value, traceback)
+        # TODO delete temporary files
 
     def open(self, ):
-        self.outfile = open(self.outfpath, 'w')
+        self.__enter__()
         return self.outfile
 
     def close(self):
         return self.__exit__(None, None, None)
 
     def _save_to_db_single(self, file_context, file_name, num_header_lines = 0):
-        # need to take in the file_context and file_name as parameters to avoid race conditions
+        """
+        Save temporary csv file into database. 
+        Parameters need to be passed in instead of using class fields 
+        because those will be changed in another thread while this is running. (Race conditions) 
+        """
+        # close the temporary csv file, makes sure everything is written in it.
         file_context.close()
 
+        # run the command in bash to import csv into database (wait until finished)
         import subprocess
         subprocess.Popen((f'clickhouse-client --password={getDbPassword()}'
         ' --format_csv_delimiter="|"'
         f' --input_format_csv_skip_first_lines={num_header_lines}'
         f' --query="INSERT INTO {self.dbname}.{self.table_name} FORMAT CSV" < "{file_name}"'),
         shell=True).wait()
+        # on second thought, it would likely be faster to call executemany() on the clickhouse python client
 
 
 
     def re_open(self):
+        """Open temp csv file for writing"""
         self.outfile = open(self.outfpath, 'w')
 
     def _save_to_db_threaded(self, *args, **kwargs):
+        """Save the current temp csv file into database in a separate thread"""
         # wait until last thread finished
         if self.latest_future is not None:
             self.latest_future.result(self.timeout_s)
 
+        # save the current temporary csv into db
         self.latest_future = self.executor.submit(self._save_to_db_single,
             self.outfile, self.outfpath, *args, **kwargs)
+        # swap temporary csv file paths
         self.outfpath, self.swapfpath = self.swapfpath, self.outfpath
         # re_open happens in write()
 
     def write(self, line, colsep):
+        """
+        Write a line to the database (via a temporary csv file).
+        The colsep parameter should be a single character that does not appear anywhere in line.
+        """
         return_value = self.outfile.write(colsep.join(line)+ '\n')
-        # save to csv if batch filled
+        # save csvs to database if batch filled
         self.line_counter += 1
         if self.line_counter % self.batch_size == 0:
-            # self.close_file_for_saving()
             self._save_to_db_threaded()
             self.re_open()
         return return_value
 
 
 class ErrorHandler:
+    """
+    A class to help handle errors, writing them to a file or crashing if a limit is reached
+    """
     def __init__(self, errorfpath, max_errors_before_crash = None, colsep = '|') -> None:
         self.errorfpath = errorfpath
         self.max_errors_before_crash = max_errors_before_crash
@@ -132,6 +174,7 @@ class ErrorHandler:
         self.error_count = 0
         pass
     
+    # for 'with' block
     def __enter__(self):
         self.open()
         return self
@@ -146,15 +189,15 @@ class ErrorHandler:
     def close(self, *args, **kwargs):
         return self.__exit__()
 
-
     def line_arr_to_str(self, line_arr):
         return self.colsep.join(line_arr)
 
     def save_and_ignore_until_max(self, line):
-        pass
+        # convert line to string if it is a list
         if isinstance(line, list):
             line = self.line_arr_to_str(line)
         print(line)
+        # getting the exception stack trace is weird in python, needs this import
         import traceback
         tb = traceback.format_exc()
         print(tb)
@@ -171,9 +214,10 @@ class ErrorHandler:
 
 class DBInfo:
     """
+    A way to keep database info in one place.
     Be VERY careful with this class, it may lead to SQL injection attacks 
     if any user-provided data is used here. 
-    (Limiting types to string literals will become available in Python 3.11)
+    (Limiting types to string literals is not available until Python 3.11)
     """
     def __init__(self, creation_string_columns, dbname = None, table_name = None) -> None:
         self.dbname = dbname
@@ -205,33 +249,41 @@ class DBInfo:
             ';"')
 
 def apply_and_save(infpaths, row_function, dbinfo, *extra_params, **extra_named_parameters):
-
-    # todo look into alternative file types for the intermediate file, csv too big (zipped may be fine)
-    # outfpath = '/mnt/sftp/module 1/tmp_module1_t1.csv'
+    """
+    Apply row_function to every row in CSVs in zips in infpaths, and save results to db like dbinfo.
+    Any extra parameters will be passed to row_function
+    """
+    # set some parameters
     outfpath = 'data/tmp_to_save.csv'
     errorfpath = 'error_file.txt'
     max_errors_before_crash = 100
     if dbinfo.dbname is None:
-        dbinfo.dbname = 'nr'
-    # consider moving this to CsvDatabaseWriter, with an optional append vs replace parameter
-    dbinfo.csv_to_db_create()
+        dbinfo.dbname = 'nr'    
+    dbinfo.csv_to_db_create() # consider moving this to CsvDatabaseWriter, with an optional append vs replace parameter
     colsep = '|'
+    csv_batch_size = 100000
+    timeout_s=60
 
-
-    with CsvDatabaseWriterThreaded(outfpath, 100000, dbinfo.dbname, dbinfo.table_name, timeout_s=60) as writer, \
+    # open database writer and error handler
+    with CsvDatabaseWriterThreaded(outfpath, csv_batch_size, dbinfo.dbname, dbinfo.table_name, timeout_s=timeout_s) as writer, \
             ErrorHandler(errorfpath, max_errors_before_crash, colsep) as error_handler:
+        # for each row in input file
         for split in split_row_generator(infpaths, colsep):
             try:
 
+                # apply row function
                 conv = row_function(split, *extra_params, **extra_named_parameters)
                 
+                # save result
                 writer.write(conv, colsep)
 
             except KeyboardInterrupt as ki:
+                # propagate KeyboardInterrupt (Ctrl+C cancel) out to stop execution
                 print(f'KeyboardInterrupt at infile line {line_num}')
-                raise ki
+                raise
             except Exception as e:
+                # don't crash on results, save to a separate file instead
                 error_handler.save_and_ignore_until_max(split)
                 pass
-        print(f'Loaded {writer.line_counter} lines into the database.')
+        print(f'Loaded {writer.line_counter} lines total into the database.')
 
