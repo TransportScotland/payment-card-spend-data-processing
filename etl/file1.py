@@ -3,14 +3,10 @@ from dimensions import *
 from shared_funcs import *
 
 def convert_row(split, dist_dict, census_dict) -> list:
-    # outfheaders = (headers.rstrip() + colsep.join([
-    #     'month','quarter','year',
-    #     'cardholder_postal_sector', 'cardholder_postal_district', 'cardholder_postal_area', 
-    #     'cardholder_postal_town', 'cardholder_postal_region',
-    #     'merchant_postal_sector', 'merchant_postal_district', 'merchant_postal_area', 
-    #     'merchant_postal_town', 'merchant_postal_region',
-    #     'driving_seconds'
-    #  ]) + '\n')
+    # time_frame,cardholder_type,cardholder_location_level,cardholder_location,
+    # merchant_location_level,merchant_location,
+    # pan_cnt,txn_cnt,txn_gbp_amt,mcc_rank1,mcc_rank2,mcc_rank3
+
 
     time_dim = time_cols(split[0])
     cardholder_location = location_cols(split[3], split[2])
@@ -90,12 +86,12 @@ def etl_real_files():
         '/mnt/sftp/module 1/nr_module_1_2021.csv.zip',
         '/mnt/sftp/in/nr_module_1_2020.csv.zip',
         '/mnt/sftp/in/nr_module_1_2022.csv.zip',
-        ], table_name = 'module1_sample')
+        ], table_name = 'module1')
 
 def etl(infpaths, table_name = 'module1'):
     import time
     time0= time.perf_counter()
-    # census_dict, dist_dict = {}, {}
+    
     census_dict = load_census_dict()
     dist_dict = load_distance_dict()
     print(f'Loading census and distance dict took {time.perf_counter() - time0}s.')
@@ -108,6 +104,5 @@ if __name__ == '__main__':
     time0 = time.perf_counter()
 
     etl_sample_file()
-    # etl('/mnt/sftp/module 1/san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2021.csv')
 
     print(f'Took {time.perf_counter() - time0} seconds to process {line_num} lines.')

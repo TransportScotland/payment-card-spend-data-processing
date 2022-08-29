@@ -66,13 +66,11 @@ def etl_real_files():
 def etl(infpaths, table_name = 'module4'):
     import time
     time0= time.perf_counter()
-    # census_dict, dist_dict = {}, {}
     census_dict = load_census_dict()
-    dist_dict = load_distance_dict()
     print(f'Loading census and distance dict took {time.perf_counter() - time0}s.')
 
     dbinfo = DBInfo(db_creation_string_columns, table_name = table_name)
-    apply_and_save(infpaths, convert_row, dbinfo, census_dict, dist_dict)
+    apply_and_save(infpaths, convert_row, dbinfo, census_dict)
 
 if __name__ == '__main__':
     import time

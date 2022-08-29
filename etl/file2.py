@@ -73,7 +73,6 @@ def etl_real_files():
 def etl(infpaths, table_name = 'module2'):
     import time
     time0= time.perf_counter()
-    # census_dict, dist_dict = {}, {}
     census_dict = load_census_dict()
     print(f'Loading census dict took {time.perf_counter() - time0}s.')
 
@@ -85,6 +84,5 @@ if __name__ == '__main__':
     time0 = time.perf_counter()
 
     etl_sample_file()
-    # etl('/mnt/sftp/module 1/san-ssapfs/edge/home/chaudhup/Network_Rail/nr_module_1_2021.csv')
 
     print(f'Took {time.perf_counter() - time0} seconds to process {line_num} lines.')

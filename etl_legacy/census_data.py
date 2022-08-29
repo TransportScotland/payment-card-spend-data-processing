@@ -107,6 +107,7 @@ def prepare_ni_census_df(table1_fpath, table2_fpath):
     # pass
 
 
+# TODO also do this for regions and total (overall) count
 def collect_locations(dfm: pd.DataFrame):
 
     # to prevent modifying the original df
