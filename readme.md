@@ -26,3 +26,8 @@ Loading may also require having some other datasets downloaded:
 * distance data in /generated_data/out_card_trips_car.csv
 
 If something goes wrong that is not very easy to fix, an overview of the code execution flow is available in notes.md.
+
+
+# Licence
+
+UK Open Government Licence V3 (OGL), see https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/ 
