@@ -83,7 +83,7 @@ def etl_sample_file():
 
 def etl_real_files():
     return etl([
-        '/mnt/sftp/module 1/nr_module_1_2021.csv.zip',
+        '/mnt/sftp/in/nr_module_1_2021.csv.zip',
         '/mnt/sftp/in/nr_module_1_2020.csv.zip',
         '/mnt/sftp/in/nr_module_1_2022.csv.zip',
         ], table_name = 'module1')
